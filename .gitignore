@@ -1,2 +1,21 @@
 .cursor/
 .env
+.DS_Store
+
+# Xcode / Swift
+DerivedData/
+.derivedData/
+*.xcresult
+*.xcuserstate
+*.xccheckout
+*.xcscmblueprint
+xcuserdata/
+
+# SwiftPM (Xcode generates this folder)
+.swiftpm/
+
+# Local scratch
+.local/
+
+# Logs
+*.log

@@ -27,7 +27,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          WORKSPACE="$(find . -maxdepth 3 -name "*.xcworkspace" -print -quit || true)"
+          # Ignore Xcode's internal workspace inside an .xcodeproj (e.g. MyApp.xcodeproj/project.xcworkspace)
+          WORKSPACE="$(find . -maxdepth 3 -name "*.xcworkspace" -not -path "*/.xcodeproj/*" -not -path "*.xcodeproj/*" -print -quit || true)"
           PROJECT="$(find . -maxdepth 3 -name "*.xcodeproj" -print -quit || true)"
 
           if [[ -n "${WORKSPACE}" ]]; then
@@ -45,14 +46,7 @@ jobs:
           fi
 
           # Pick the first listed scheme. (For real projects you may want to hardcode this.)
-          SCHEME="$(python3 - <<'PY' <<< "${JSON}"
-          import json, sys
-          data = json.loads(sys.stdin.read())
-          root = data.get("workspace") or data.get("project") or {}
-          schemes = root.get("schemes") or []
-          print(schemes[0] if schemes else "")
-          PY
-          )"
+          SCHEME="$(printf '%s' "${JSON}" | python3 -c 'import json,sys; data=json.load(sys.stdin); root=(data.get("workspace") or data.get("project") or {}); schemes=(root.get("schemes") or []); print(schemes[0] if schemes else "")')"
 
           if [[ -z "${SCHEME}" ]]; then
             echo "ERROR: No schemes found."
@@ -62,6 +56,16 @@ jobs:
           fi
 
           echo "scheme=${SCHEME}" >> "$GITHUB_OUTPUT"
+
+          # Pick an available iPhone simulator (avoid hardcoding a specific model)
+          SIM_JSON="$(xcrun simctl list -j devices available)"
+          UDID="$(printf '%s' "${SIM_JSON}" | python3 -c 'import json,sys,re; data=json.load(sys.stdin); devices=(data.get(\"devices\",{}) or {}); devs=[]; [devs.extend(v or []) for v in devices.values()]; iph=[d for d in devs if d.get(\"isAvailable\") and str(d.get(\"name\",\"\")).startswith(\"iPhone\") and d.get(\"udid\")]; pref=[d for d in iph if re.match(r\"^iPhone\\s+\\d\", str(d.get(\"name\",\"\")))]; use=(pref or iph); use.sort(key=lambda d:(\"Pro Max\" in d.get(\"name\",\"\"), re.search(r\"\\bPro\\b\", d.get(\"name\",\"\")) is not None, d.get(\"name\",\"\"))); print(use[-1][\"udid\"] if use else \"\")')"
+          if [[ -z "${UDID}" ]]; then
+            echo "ERROR: Could not find an available iPhone simulator on this runner."
+            xcrun simctl list devices available
+            exit 1
+          fi
+          echo "destination=platform=iOS Simulator,id=${UDID}" >> "$GITHUB_OUTPUT"
 
       - name: Resolve Swift Package dependencies
         shell: bash
@@ -78,13 +82,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [[ ! -f ".swiftlint.yml" ]]; then
+            echo "No .swiftlint.yml found; skipping SwiftLint."
+            exit 0
+          fi
 
           if ! command -v swiftlint >/dev/null 2>&1; then
             export HOMEBREW_NO_AUTO_UPDATE=1
             brew install swiftlint
           fi
 
-          # If you later add `.swiftlint.yml`, SwiftLint will automatically pick it up.
           swiftlint version
           swiftlint lint --reporter github-actions-logging
 
@@ -92,8 +99,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
-          DESTINATION="platform=iOS Simulator,OS=latest,name=iPhone 15"
+          DESTINATION="${{ steps.xcode.outputs.destination }}"
           COMMON_ARGS=(
             -scheme "${{ steps.xcode.outputs.scheme }}"
             -destination "${DESTINATION}"
@@ -112,8 +118,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
-          DESTINATION="platform=iOS Simulator,OS=latest,name=iPhone 15"
+          DESTINATION="${{ steps.xcode.outputs.destination }}"
           COMMON_ARGS=(
             -scheme "${{ steps.xcode.outputs.scheme }}"
             -destination "${DESTINATION}"
