@@ -1,0 +1,686 @@
+{
+  "version": "1.0.0",
+  "exercises": [
+  {
+    "Exercise Name": "Bench Press (Barbell)"
+  },
+  {
+    "Exercise Name": "Squat (Barbell)"
+  },
+  {
+    "Exercise Name": "Incline Bench Press (Dumbbell)"
+  },
+  {
+    "Exercise Name": "Incline Row (Barbell)"
+  },
+  {
+    "Exercise Name": "Overhead Press (Barbell)"
+  },
+  {
+    "Exercise Name": "Pull Up"
+  },
+  {
+    "Exercise Name": "Incline Curl (Dumbbell)"
+  },
+  {
+    "Exercise Name": "Triceps Pushdown (Cable - Straight Bar)"
+  },
+  {
+    "Exercise Name": "Incline Triceps Extension (Dumbbell)"
+  },
+  {
+    "Exercise Name": "Lateral Raise (Dumbbell)"
+  },
+  {
+    "Exercise Name": "Hanging Leg Raise"
+  },
+  {
+    "Exercise Name": "Cable Twist"
+  },
+  {
+    "Exercise Name": "Cable Crunch"
+  },
+  {
+    "Exercise Name": "Concentration Curl (Dumbbell)"
+  },
+  {
+    "Exercise Name": "Hip Thrust (Barbell)"
+  },
+  {
+    "Exercise Name": "Contralateral Split Squat"
+  },
+  {
+    "Exercise Name": "Seated Leg Curl (Machine)"
+  },
+  {
+    "Exercise Name": "Leg Extension (Machine)"
+  },
+  {
+    "Exercise Name": "Seated Calf Raise (Plate Loaded)"
+  },
+  {
+    "Exercise Name": "Deadlift (Barbell)"
+  },
+  {
+    "Exercise Name": "Bent Over Row (Barbell)"
+  },
+  {
+    "Exercise Name": "Overhead Press (Dumbbell)"
+  },
+  {
+    "Exercise Name": "Chin Up"
+  },
+  {
+    "Exercise Name": "Iso-Lateral Row (Machine)"
+  },
+  {
+    "Exercise Name": "Chest Dip"
+  },
+  {
+    "Exercise Name": "Lateral Raise (Cable)"
+  },
+  {
+    "Exercise Name": "Running (Treadmill)"
+  },
+  {
+    "Exercise Name": "Bicep Curl (Barbell)"
+  },
+  {
+    "Exercise Name": "Glute Ham Raise"
+  },
+  {
+    "Exercise Name": "Seated Overhead Press (Barbell)"
+  },
+  {
+    "Exercise Name": "Lat Pulldown (Cable)"
+  },
+  {
+    "Exercise Name": "Bicep Curl (Dumbbell)"
+  },
+  {
+    "Exercise Name": "Hammer Curl (Dumbbell)"
+  },
+  {
+    "Exercise Name": "Seated Leg Press (Machine)"
+  },
+  {
+    "Exercise Name": "Seated Overhead Press (Dumbbell)"
+  },
+  {
+    "Exercise Name": "Lying Leg Curl (Machine)"
+  },
+  {
+    "Exercise Name": "Triceps Extension (Barbell)"
+  },
+  {
+    "Exercise Name": "Lat Pulldown (Machine)"
+  },
+  {
+    "Exercise Name": "Reverse Fly (Machine)"
+  },
+  {
+    "Exercise Name": "Shrug (Dumbbell)"
+  },
+  {
+    "Exercise Name": "Romanian Deadlift (Barbell)"
+  },
+  {
+    "Exercise Name": "Leg Press"
+  },
+  {
+    "Exercise Name": "Standing Calf Raise (Dumbbell)"
+  },
+  {
+    "Exercise Name": "One Arm Tricep Pushdown"
+  },
+  {
+    "Exercise Name": "Face Pull (Cable)"
+  },
+  {
+    "Exercise Name": "Bulgarian Split Squat"
+  },
+  {
+    "Exercise Name": "Incline Bench Press (Barbell)"
+  },
+  {
+    "Exercise Name": "Iso-Lateral Chest Press (Machine)"
+  },
+  {
+    "Exercise Name": "Front Squat (Barbell)"
+  },
+  {
+    "Exercise Name": "Standing Calf Raise (Barbell)"
+  },
+  {
+    "Exercise Name": "Incline Chest Fly (Dumbbell)"
+  },
+  {
+    "Exercise Name": "Upright Row (Barbell)"
+  },
+  {
+    "Exercise Name": "Shoulder Press (Machine)"
+  },
+  {
+    "Exercise Name": "Lat Pulldown - Underhand (Cable)"
+  },
+  {
+    "Exercise Name": "Seated Row (Machine)"
+  },
+  {
+    "Exercise Name": "Upright Row (Cable)"
+  },
+  {
+    "Exercise Name": "Close Grip Lat Pulldoen"
+  },
+  {
+    "Exercise Name": "Sumo Deadlift (Barbell)"
+  },
+  {
+    "Exercise Name": "Bench Press - Close Grip (Barbell)"
+  },
+  {
+    "Exercise Name": "Hip Adductor (Machine)"
+  },
+  {
+    "Exercise Name": "Chest Press (Machine)"
+  },
+  {
+    "Exercise Name": "Triceps Extension (Dumbbell)"
+  },
+  {
+    "Exercise Name": "T Bar Row"
+  },
+  {
+    "Exercise Name": "Hip Abductor (Machine)"
+  },
+  {
+    "Exercise Name": "ATG Squat"
+  },
+  {
+    "Exercise Name": "Roll"
+  },
+  {
+    "Exercise Name": "Stretching"
+  },
+  {
+    "Exercise Name": "Front Raise (Barbell)"
+  },
+  {
+    "Exercise Name": "Dumbell chest supported row"
+  },
+  {
+    "Exercise Name": "Neutral Grip Lat Pulldown"
+  },
+  {
+    "Exercise Name": "Hack Squat"
+  },
+  {
+    "Exercise Name": "Triceps Extension (Cable)"
+  },
+  {
+    "Exercise Name": "Bicep Curl (Cable)"
+  },
+  {
+    "Exercise Name": "Tricep Pushdown (Rope)"
+  },
+  {
+    "Exercise Name": "Preacher Curl (Barbell)"
+  },
+  {
+    "Exercise Name": "Snatch (Barbell)"
+  },
+  {
+    "Exercise Name": "Hammer Curl (Cable)"
+  },
+  {
+    "Exercise Name": "Pin Squat"
+  },
+  {
+    "Exercise Name": "Knee Raise (Captain's Chair)"
+  },
+  {
+    "Exercise Name": "Back Extension"
+  },
+  {
+    "Exercise Name": "Shin Curls"
+  },
+  {
+    "Exercise Name": "Seated Wide-Grip Row (Cable)"
+  },
+  {
+    "Exercise Name": "Reverse Fly (Cable)"
+  },
+  {
+    "Exercise Name": "Cable Crossover"
+  },
+  {
+    "Exercise Name": "Stiff Leg Deadlift (Dumbbell)"
+  },
+  {
+    "Exercise Name": "Standing Calf Raise (Smith Machine)"
+  },
+  {
+    "Exercise Name": "Bent Over Row - Underhand (Barbell)"
+  },
+  {
+    "Exercise Name": "Seated Row (Cable)"
+  },
+  {
+    "Exercise Name": "Pec Deck (Machine)"
+  },
+  {
+    "Exercise Name": "Lat Pullthrough"
+  },
+  {
+    "Exercise Name": "Seated Lateral Raise"
+  },
+  {
+    "Exercise Name": "Preacher Curl (Machine)"
+  },
+  {
+    "Exercise Name": "Dynamic Stretching"
+  },
+  {
+    "Exercise Name": "Pause Overhead Press"
+  },
+  {
+    "Exercise Name": "Pause Bent Over Row"
+  },
+  {
+    "Exercise Name": "Pause Sumo Deadlift"
+  },
+  {
+    "Exercise Name": "Pause Bench Press"
+  },
+  {
+    "Exercise Name": "Pause Deadlift"
+  },
+  {
+    "Exercise Name": "Pause Squat"
+  },
+  {
+    "Exercise Name": "Bent Over Row (Dumbbell)"
+  },
+  {
+    "Exercise Name": "Bent Over One Arm Row (Dumbbell)"
+  },
+  {
+    "Exercise Name": "Skullcrusher (Barbell)"
+  },
+  {
+    "Exercise Name": "Standing Calf Raise (Machine)"
+  },
+  {
+    "Exercise Name": "Back Extension (Machine)"
+  },
+  {
+    "Exercise Name": "Practice Squat"
+  },
+  {
+    "Exercise Name": "Calf Stretches"
+  },
+  {
+    "Exercise Name": "Hip Stretches"
+  },
+  {
+    "Exercise Name": "Practice Bench"
+  },
+  {
+    "Exercise Name": "Full Can"
+  },
+  {
+    "Exercise Name": "Rotates"
+  },
+  {
+    "Exercise Name": "Calf Rubs"
+  },
+  {
+    "Exercise Name": "Calf Wall"
+  },
+  {
+    "Exercise Name": "Band Exercuses"
+  },
+  {
+    "Exercise Name": "Single Leg Squats"
+  },
+  {
+    "Exercise Name": "90-90 Stretches"
+  },
+  {
+    "Exercise Name": "Practice Sumo"
+  },
+  {
+    "Exercise Name": "Practice Deadlift"
+  },
+  {
+    "Exercise Name": "Squat (Machine)"
+  },
+  {
+    "Exercise Name": "Lat Pulldown (Single Arm)"
+  },
+  {
+    "Exercise Name": "Hip Extension"
+  },
+  {
+    "Exercise Name": "Bent Over cable row"
+  },
+  {
+    "Exercise Name": "Shoulder Press (Plate Loaded)"
+  },
+  {
+    "Exercise Name": "Lateral Raise (Machine)"
+  },
+  {
+    "Exercise Name": "Triceps Extension (Machine)"
+  },
+  {
+    "Exercise Name": "Low Row"
+  },
+  {
+    "Exercise Name": "Shoulder Stretch"
+  },
+  {
+    "Exercise Name": "Rack Pull (Barbell)"
+  },
+  {
+    "Exercise Name": "Seated Palms Up Wrist Curl (Dumbbell)"
+  },
+  {
+    "Exercise Name": "Seal Row"
+  },
+  {
+    "Exercise Name": "Seated Dip"
+  },
+  {
+    "Exercise Name": "Front Raise (Dumbbell)"
+  },
+  {
+    "Exercise Name": "Calf Press on Seated Leg Press"
+  },
+  {
+    "Exercise Name": "Shrug (Barbell)"
+  },
+  {
+    "Exercise Name": "Cable Wrist Curl"
+  },
+  {
+    "Exercise Name": "Crunch (Machine)"
+  },
+  {
+    "Exercise Name": "Pin Press"
+  },
+  {
+    "Exercise Name": "Low Bar Squat (Barbel)"
+  },
+  {
+    "Exercise Name": "Reverse Fly (Dumbbell)"
+  },
+  {
+    "Exercise Name": "Preacher Curl (Dumbbell)"
+  },
+  {
+    "Exercise Name": "Triceps Extension (Cable - Straight Bar)"
+  },
+  {
+    "Exercise Name": "Face Away Bayesian Curl (Cable)"
+  },
+  {
+    "Exercise Name": "Leg Extension (Plate Loaded)"
+  },
+  {
+    "Exercise Name": "Preacher Hammer Curl (Dumbell)"
+  },
+  {
+    "Exercise Name": "Pullover (Machine)"
+  },
+  {
+    "Exercise Name": "Low Chest Fly (Cable)"
+  },
+  {
+    "Exercise Name": "Reverse Curl (Barbell)"
+  },
+  {
+    "Exercise Name": "smith machine bulgarian split squat"
+  },
+  {
+    "Exercise Name": "Bicep Curl (Machine)"
+  },
+  {
+    "Exercise Name": "Lat Pullthrough (Machine)"
+  },
+  {
+    "Exercise Name": "One Arm Seated Row"
+  },
+  {
+    "Exercise Name": "Decline Crunch"
+  },
+  {
+    "Exercise Name": "Squat (Bodyweight)"
+  },
+  {
+    "Exercise Name": "Iso Lateral Leg Press"
+  },
+  {
+    "Exercise Name": "Box Jump (With Height)"
+  },
+  {
+    "Exercise Name": "Triceps Extension"
+  },
+  {
+    "Exercise Name": "pushdown V bar"
+  },
+  {
+    "Exercise Name": "Arm Pulldown"
+  },
+  {
+    "Exercise Name": "Chest Fly"
+  },
+  {
+    "Exercise Name": "Romanian Deadlift (Dumbbell)"
+  },
+  {
+    "Exercise Name": "Shrug (Machine)"
+  },
+  {
+    "Exercise Name": "Bicycle Crunch"
+  },
+  {
+    "Exercise Name": "Crunch"
+  },
+  {
+    "Exercise Name": "snatch grip deadlift"
+  },
+  {
+    "Exercise Name": "Calf Press on Leg Press"
+  },
+  {
+    "Exercise Name": "Incline Chest Press (Machine)"
+  },
+  {
+    "Exercise Name": "Goblet Squat (Kettlebell)"
+  },
+  {
+    "Exercise Name": "Single Leg Press"
+  },
+  {
+    "Exercise Name": "Deficit Deadlift (Barbell)"
+  },
+  {
+    "Exercise Name": "Chest Fly (Band)"
+  },
+  {
+    "Exercise Name": "Pendlay Row (Barbell)"
+  },
+  {
+    "Exercise Name": "Pause Benchpress"
+  },
+  {
+    "Exercise Name": "pendulum squat"
+  },
+  {
+    "Exercise Name": "Glute Kickback (Machine)"
+  },
+  {
+    "Exercise Name": "Lunge (Barbell)"
+  },
+  {
+    "Exercise Name": "pinned Squat"
+  },
+  {
+    "Exercise Name": "Incline Bench Press (Smith Machine)"
+  },
+  {
+    "Exercise Name": "single Arm Tricep pushdown"
+  },
+  {
+    "Exercise Name": "Overhead Press (Smith Machine)"
+  },
+  {
+    "Exercise Name": "spider Curl"
+  },
+  {
+    "Exercise Name": "Bench Press (Dumbbell)"
+  },
+  {
+    "Exercise Name": "Lunge (Dumbbell)"
+  },
+  {
+    "Exercise Name": "Decline Bench Press (Dumbbell)"
+  },
+  {
+    "Exercise Name": "Box Jump"
+  },
+  {
+    "Exercise Name": "Incline Row (Dumbbell)"
+  },
+  {
+    "Exercise Name": "Block Sumo Deadlift"
+  },
+  {
+    "Exercise Name": "Plank"
+  },
+  {
+    "Exercise Name": "single leg RDL"
+  },
+  {
+    "Exercise Name": "Chest Fly (Dumbbell)"
+  },
+  {
+    "Exercise Name": "reverse hypertension"
+  },
+  {
+    "Exercise Name": "BW Burpee"
+  },
+  {
+    "Exercise Name": "BW mount climber"
+  },
+  {
+    "Exercise Name": "Squat Jump"
+  },
+  {
+    "Exercise Name": "Shadow Boxing"
+  },
+  {
+    "Exercise Name": "running In Place"
+  },
+  {
+    "Exercise Name": "Tricep Pushdown Rope"
+  },
+  {
+    "Exercise Name": "back plank"
+  },
+  {
+    "Exercise Name": "Larsen Press"
+  },
+  {
+    "Exercise Name": "incline Chest Fly"
+  },
+  {
+    "Exercise Name": "Incline DB Seal Row"
+  },
+  {
+    "Exercise Name": "Deadlift High Pull (Barbell)"
+  },
+  {
+    "Exercise Name": "Front Raise (Cable)"
+  },
+  {
+    "Exercise Name": "Side Bend (Dumbbell)"
+  },
+  {
+    "Exercise Name": "Triceps Dip"
+  },
+  {
+    "Exercise Name": "Close Grip Latpulldown"
+  },
+  {
+    "Exercise Name": "Sit Up"
+  },
+  {
+    "Exercise Name": "Squat (Smith Machine)"
+  },
+  {
+    "Exercise Name": "Incline Bicep Curl"
+  },
+  {
+    "Exercise Name": "Shrug (Smith Machine)"
+  },
+  {
+    "Exercise Name": "One Arm Pulldown"
+  },
+  {
+    "Exercise Name": "Bench Dip"
+  },
+  {
+    "Exercise Name": "Push Up"
+  },
+  {
+    "Exercise Name": "Trap Bar Deadlift"
+  },
+  {
+    "Exercise Name": "Single Arm Extension"
+  },
+  {
+    "Exercise Name": "Bent Over Raise"
+  },
+  {
+    "Exercise Name": "Chest supported Row"
+  },
+  {
+    "Exercise Name": "Power Clean"
+  },
+  {
+    "Exercise Name": "Seated Dips"
+  },
+  {
+    "Exercise Name": "farmer walk"
+  },
+  {
+    "Exercise Name": "Cable Kickback"
+  },
+  {
+    "Exercise Name": "15 Degree bench"
+  },
+  {
+    "Exercise Name": "15 Degree Incline"
+  },
+  {
+    "Exercise Name": "Belt Squat"
+  },
+  {
+    "Exercise Name": "High row"
+  },
+  {
+    "Exercise Name": "V Up"
+  },
+  {
+    "Exercise Name": "Box Squat (Barbell)"
+  },
+  {
+    "Exercise Name": "Decline Chest Press"
+  },
+  {
+    "Exercise Name": "Hanging Knee Raise"
+  }
+]}
+

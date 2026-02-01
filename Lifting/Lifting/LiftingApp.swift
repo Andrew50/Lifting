@@ -9,14 +9,11 @@ import SwiftUI
 
 @main
 struct LiftingApp: App {
-    init() {
-        _ = ExerciseDatabase.shared
-        print("Database initialized")
-    }
-    
+    @StateObject private var container = AppContainer()
+
     var body: some Scene {
         WindowGroup {
-            ExerciseListView()  // Change this to show the exercise list
+            ContentView(container: container)
         }
     }
 }

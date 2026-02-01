@@ -11,6 +11,8 @@ import UIKit
 #endif
 
 struct ContentView: View {
+    @ObservedObject var container: AppContainer
+
     private enum AppTab: Hashable {
         case workout
         case history
@@ -23,7 +25,6 @@ struct ContentView: View {
     private let fallbackHistoryTabIconName = "clock"
 
     @State private var selectedTab: AppTab = .workout
-    @StateObject private var historyStore = WorkoutHistoryStore()
     @StateObject private var tabReselect = TabReselectCoordinator()
 
     private var workoutTabIconName: String {
@@ -50,13 +51,23 @@ struct ContentView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            WorkoutView()
+            WorkoutView(
+                templateStore: container.templateStore,
+                workoutStore: container.workoutStore,
+                exerciseStore: container.exerciseStore
+            )
                 .tabItem {
                     Label("Workout", systemImage: workoutTabIconName)
                 }
                 .tag(AppTab.workout)
 
-            HistoryView(store: historyStore, tabReselect: tabReselect)
+            HistoryView(
+                historyStore: container.historyStore,
+                workoutStore: container.workoutStore,
+                templateStore: container.templateStore,
+                exerciseStore: container.exerciseStore,
+                tabReselect: tabReselect
+            )
                 .tabItem {
                     Label("History", systemImage: historyTabIconName)
                 }
@@ -74,6 +85,6 @@ struct ContentView: View {
 
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
-        ContentView()
+        ContentView(container: AppContainer())
     }
 }

@@ -8,10 +8,17 @@
 import SwiftUI
 
 struct HistoryView: View {
-    @ObservedObject var store: WorkoutHistoryStore
+    @ObservedObject var historyStore: HistoryStore
+    @ObservedObject var workoutStore: WorkoutStore
+    @ObservedObject var templateStore: TemplateStore
+    @ObservedObject var exerciseStore: ExerciseStore
     @ObservedObject var tabReselect: TabReselectCoordinator
 
-    @State private var path: [WorkoutHistoryItem] = []
+    enum Route: Hashable {
+        case workout(String)
+    }
+
+    @State private var path: [Route] = []
 
     private enum ScrollAnchor {
         static let top = "historyTop"
@@ -28,13 +35,13 @@ struct HistoryView: View {
                         .listRowInsets(EdgeInsets())
                         .listRowSeparator(.hidden)
 
-                    ForEach(store.workouts) { workout in
-                        NavigationLink(value: workout) {
+                    ForEach(historyStore.workouts) { workout in
+                        NavigationLink(value: Route.workout(workout.id)) {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(workout.name)
                                     .font(.body.weight(.medium))
 
-                                Text(workout.date, format: .dateTime.year().month().day())
+                                Text(workout.completedAt, format: .dateTime.year().month().day())
                                     .font(.footnote)
                                     .foregroundStyle(.secondary)
                             }
@@ -54,8 +61,17 @@ struct HistoryView: View {
                     }
                 }
             }
-            .navigationDestination(for: WorkoutHistoryItem.self) { workout in
-                WorkoutEditorPlaceholderScreen(entryPoint: .editHistoryWorkout(workout))
+            .navigationDestination(for: Route.self) { route in
+                switch route {
+                case .workout(let workoutId):
+                    WorkoutEditorView(
+                        templateStore: templateStore,
+                        workoutStore: workoutStore,
+                        exerciseStore: exerciseStore,
+                        subject: .workout(id: workoutId),
+                        onFinish: { path.removeAll() }
+                    )
+                }
             }
         }
     }
@@ -63,7 +79,14 @@ struct HistoryView: View {
 
 struct HistoryView_Previews: PreviewProvider {
     static var previews: some View {
-        HistoryView(store: WorkoutHistoryStore(), tabReselect: TabReselectCoordinator())
+        let container = AppContainer()
+        HistoryView(
+            historyStore: container.historyStore,
+            workoutStore: container.workoutStore,
+            templateStore: container.templateStore,
+            exerciseStore: container.exerciseStore,
+            tabReselect: TabReselectCoordinator()
+        )
     }
 }
 
