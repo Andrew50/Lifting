@@ -31,6 +31,12 @@ struct TemplateRecord: Codable, FetchableRecord, PersistableRecord, TableRecord,
     var createdAt: TimeInterval
     var updatedAt: TimeInterval
 
+    enum CodingKeys: String, CodingKey {
+        case id, name
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+
     enum Columns: String, ColumnExpression {
         case id, name
         case createdAt = "created_at"
@@ -46,6 +52,14 @@ struct TemplateExerciseRecord: Codable, FetchableRecord, PersistableRecord, Tabl
     var exerciseId: String
     var sortOrder: Int
     var plannedSetsCount: Int
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case templateId = "template_id"
+        case exerciseId = "exercise_id"
+        case sortOrder = "sort_order"
+        case plannedSetsCount = "planned_sets_count"
+    }
 
     enum Columns: String, ColumnExpression {
         case id
@@ -75,6 +89,15 @@ struct WorkoutRecord: Codable, FetchableRecord, PersistableRecord, TableRecord, 
     var createdAt: TimeInterval
     var updatedAt: TimeInterval
 
+    enum CodingKeys: String, CodingKey {
+        case id, name, status
+        case sourceTemplateId = "source_template_id"
+        case startedAt = "started_at"
+        case completedAt = "completed_at"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+
     enum Columns: String, ColumnExpression {
         case id, name, status
         case sourceTemplateId = "source_template_id"
@@ -93,6 +116,13 @@ struct WorkoutExerciseRecord: Codable, FetchableRecord, PersistableRecord, Table
     var exerciseId: String
     var sortOrder: Int
 
+    enum CodingKeys: String, CodingKey {
+        case id
+        case workoutId = "workout_id"
+        case exerciseId = "exercise_id"
+        case sortOrder = "sort_order"
+    }
+
     enum Columns: String, ColumnExpression {
         case id
         case workoutId = "workout_id"
@@ -110,6 +140,13 @@ struct WorkoutSetRecord: Codable, FetchableRecord, PersistableRecord, TableRecor
     var weight: Double?
     var reps: Int?
     var rir: Double?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case workoutExerciseId = "workout_exercise_id"
+        case sortOrder = "sort_order"
+        case weight, reps, rir
+    }
 
     enum Columns: String, ColumnExpression {
         case id

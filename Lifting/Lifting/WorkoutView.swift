@@ -18,6 +18,7 @@ struct WorkoutView: View {
     }
 
     @State private var path: [Route] = []
+    @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -27,7 +28,10 @@ struct WorkoutView: View {
                         do {
                             let workoutId = try workoutStore.startOrResumePendingWorkout()
                             path.append(.workout(workoutId))
-                        } catch { }
+                        } catch {
+                            errorMessage = "Start Workout failed: \(error)"
+                            print(errorMessage ?? "")
+                        }
                     } label: {
                         Text("Start Workout")
                             .frame(maxWidth: .infinity, alignment: .center)
@@ -48,7 +52,10 @@ struct WorkoutView: View {
                         do {
                             let templateId = try templateStore.createTemplate(name: "New Template")
                             path.append(.template(templateId))
-                        } catch { }
+                        } catch {
+                            errorMessage = "Create Template failed: \(error)"
+                            print(errorMessage ?? "")
+                        }
                     } label: {
                         Label("Create Template", systemImage: "plus")
                     }
@@ -76,16 +83,29 @@ struct WorkoutView: View {
                     )
                 }
             }
+            .alert("Error", isPresented: Binding(
+                get: { errorMessage != nil },
+                set: { isPresented in
+                    if !isPresented { errorMessage = nil }
+                }
+            )) {
+                Button("OK", role: .cancel) {
+                    errorMessage = nil
+                }
+            } message: {
+                Text(errorMessage ?? "")
+            }
         }
     }
 }
 
 struct WorkoutView_Previews: PreviewProvider {
     static var previews: some View {
+        let container = AppContainer()
         WorkoutView(
-            templateStore: AppContainer().templateStore,
-            workoutStore: AppContainer().workoutStore,
-            exerciseStore: AppContainer().exerciseStore
+            templateStore: container.templateStore,
+            workoutStore: container.workoutStore,
+            exerciseStore: container.exerciseStore
         )
     }
 }

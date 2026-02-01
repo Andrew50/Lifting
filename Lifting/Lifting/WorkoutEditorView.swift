@@ -23,6 +23,8 @@ struct WorkoutEditorView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var title: String = ""
+    @State private var lastLoadedTitle: String = ""
+    @State private var hasLoadedInitialTitle: Bool = false
     @State private var isPendingWorkout: Bool = false
 
     @State private var templateExercises: [TemplateExerciseDetail] = []
@@ -33,14 +35,20 @@ struct WorkoutEditorView: View {
 
     // MARK: - Load
 
-    private func reload() {
+    private func reload(shouldRefreshTitle: Bool) {
         switch subject {
         case .template(let templateId):
             do {
                 if let template = try templateStore.fetchTemplate(templateId: templateId) {
-                    title = template.name
+                    if shouldRefreshTitle {
+                        title = template.name
+                    }
+                    lastLoadedTitle = template.name
                 } else {
-                    title = "Template"
+                    if shouldRefreshTitle {
+                        title = "Template"
+                    }
+                    lastLoadedTitle = "Template"
                 }
                 templateExercises = try templateStore.fetchTemplateExercises(templateId: templateId)
                 isPendingWorkout = false
@@ -52,19 +60,35 @@ struct WorkoutEditorView: View {
         case .workout(let workoutId):
             do {
                 if let workout = try workoutStore.fetchWorkout(workoutId: workoutId) {
-                    title = workout.name
+                    if shouldRefreshTitle {
+                        title = workout.name
+                    }
+                    lastLoadedTitle = workout.name
                     isPendingWorkout = (workout.status == .pending)
                 } else {
-                    title = "Workout"
+                    if shouldRefreshTitle {
+                        title = "Workout"
+                    }
+                    lastLoadedTitle = "Workout"
                     isPendingWorkout = false
                 }
                 workoutExercises = try workoutStore.fetchWorkoutExercises(workoutId: workoutId)
             } catch {
-                title = "Workout"
+                if shouldRefreshTitle {
+                    title = "Workout"
+                }
+                lastLoadedTitle = "Workout"
                 isPendingWorkout = false
                 workoutExercises = []
             }
         }
+    }
+
+    private func reloadPreservingTitleEdits() {
+        // Only overwrite the draft title if the user hasn't changed it.
+        let userHasEditedTitle = hasLoadedInitialTitle && (title != lastLoadedTitle)
+        reload(shouldRefreshTitle: !userHasEditedTitle)
+        hasLoadedInitialTitle = true
     }
 
     // MARK: - Header actions
@@ -123,13 +147,13 @@ struct WorkoutEditorView: View {
             do {
                 try templateStore.addTemplateExercise(templateId: templateId, exerciseId: exercise.id)
             } catch { }
-            reload()
+            reloadPreservingTitleEdits()
 
         case .workout(let workoutId):
             do {
                 try workoutStore.addWorkoutExercise(workoutId: workoutId, exerciseId: exercise.id)
             } catch { }
-            reload()
+            reloadPreservingTitleEdits()
         }
     }
 
@@ -155,6 +179,9 @@ struct WorkoutEditorView: View {
         .toolbar {
             toolbarItems
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            bottomActionBar
+        }
         .navigationDestination(isPresented: $isShowingExercisePicker) {
             ExercisePickerView(exerciseStore: exerciseStore, onSelect: didPickExercise)
         }
@@ -168,43 +195,77 @@ struct WorkoutEditorView: View {
             )
         }
         .onAppear {
-            reload()
+            reload(shouldRefreshTitle: true)
+            hasLoadedInitialTitle = true
         }
     }
 
     @ToolbarContentBuilder
     private var toolbarItems: some ToolbarContent {
         switch subject {
-        case .template(let templateId):
+        case .template:
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button("Save") { saveAndClose() }
             }
-            ToolbarItemGroup(placement: .bottomBar) {
+
+        case .workout:
+            if !isPendingWorkout {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button("Save") { saveAndClose() }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var bottomActionBar: some View {
+        switch subject {
+        case .template(let templateId):
+            actionBar {
                 Button("Start") {
                     do {
                         let workoutId = try workoutStore.startPendingWorkout(fromTemplate: templateId)
                         activeWorkoutIdToPush = workoutId
                     } catch { }
                 }
+                .buttonStyle(.borderedProminent)
+
                 Spacer()
+
                 Button("Delete", role: .destructive) { deleteAndClose() }
+                    .buttonStyle(.bordered)
             }
 
         case .workout(let workoutId):
             if isPendingWorkout {
-                ToolbarItemGroup(placement: .bottomBar) {
+                actionBar {
                     Button("Complete") { completeAndClose(workoutId: workoutId) }
+                        .buttonStyle(.borderedProminent)
+
                     Spacer()
+
                     Button("Discard", role: .destructive) { discardAndClose(workoutId: workoutId) }
+                        .buttonStyle(.bordered)
                 }
             } else {
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    Button("Save") { saveAndClose() }
-                }
-                ToolbarItemGroup(placement: .bottomBar) {
+                actionBar {
+                    Spacer()
                     Button("Delete", role: .destructive) { deleteAndClose() }
+                        .buttonStyle(.bordered)
                 }
             }
+        }
+    }
+
+    private func actionBar(@ViewBuilder content: () -> some View) -> some View {
+        VStack(spacing: 0) {
+            Divider()
+            HStack(spacing: 12) {
+                content()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.ultraThinMaterial)
         }
     }
 
@@ -227,7 +288,7 @@ struct WorkoutEditorView: View {
                             do {
                                 try templateStore.updatePlannedSets(templateExerciseId: item.id, plannedSetsCount: clamped)
                             } catch { }
-                            reload()
+                            reloadPreservingTitleEdits()
                         }
                     ), in: 0...20) {
                         Text("\(item.plannedSetsCount) sets")
@@ -239,13 +300,15 @@ struct WorkoutEditorView: View {
                         do {
                             try templateStore.deleteTemplateExercise(templateExerciseId: item.id)
                         } catch { }
-                        reload()
+                        reloadPreservingTitleEdits()
                     } label: {
                         Label("Delete", systemImage: "trash")
                     }
                 }
             }
+        }
 
+        Section {
             Button {
                 isShowingExercisePicker = true
             } label: {
@@ -256,14 +319,30 @@ struct WorkoutEditorView: View {
 
     @ViewBuilder
     private func workoutSection(workoutId: String) -> some View {
-        Section("Exercises") {
-            if workoutExercises.isEmpty {
+        if workoutExercises.isEmpty {
+            Section("Exercises") {
                 Text("No exercises yet.")
                     .foregroundStyle(.secondary)
             }
-
+        } else {
             ForEach(workoutExercises) { exercise in
-                Section(exercise.exerciseName) {
+                Section {
+                    HStack {
+                        Text(exercise.exerciseName)
+                            .font(.headline)
+                        Spacer()
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            do {
+                                try workoutStore.deleteWorkoutExercise(workoutExerciseId: exercise.id)
+                            } catch { }
+                            reloadPreservingTitleEdits()
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+
                     ForEach(exercise.sets) { set in
                         WorkoutSetRow(
                             set: set,
@@ -278,7 +357,7 @@ struct WorkoutEditorView: View {
                                 do {
                                     try workoutStore.deleteSet(setId: set.id)
                                 } catch { }
-                                reload()
+                                reloadPreservingTitleEdits()
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
@@ -289,13 +368,15 @@ struct WorkoutEditorView: View {
                         do {
                             try workoutStore.addSet(workoutExerciseId: exercise.id)
                         } catch { }
-                        reload()
+                        reloadPreservingTitleEdits()
                     } label: {
                         Label("Add Set", systemImage: "plus")
                     }
                 }
             }
+        }
 
+        Section {
             Button {
                 isShowingExercisePicker = true
             } label: {

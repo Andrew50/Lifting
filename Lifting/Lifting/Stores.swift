@@ -430,6 +430,29 @@ final class WorkoutStore: ObservableObject {
         }
     }
 
+    func deleteWorkoutExercise(workoutExerciseId: String) throws {
+        let now = Date().timeIntervalSince1970
+        try dbQueue.write { db in
+            let workoutId: String? = try String.fetchOne(
+                db,
+                sql: "SELECT workout_id FROM workout_exercises WHERE id = ?",
+                arguments: [workoutExerciseId]
+            )
+
+            try db.execute(
+                sql: "DELETE FROM workout_exercises WHERE id = ?",
+                arguments: [workoutExerciseId]
+            )
+
+            if let workoutId {
+                try db.execute(
+                    sql: "UPDATE workouts SET updated_at = ? WHERE id = ?",
+                    arguments: [now, workoutId]
+                )
+            }
+        }
+    }
+
     func updateSet(setId: String, weight: Double?, reps: Int?, rir: Double?) throws {
         try dbQueue.write { db in
             try db.execute(
