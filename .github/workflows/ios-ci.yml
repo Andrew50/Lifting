@@ -1,0 +1,130 @@
+name: iOS CI
+
+on:
+  pull_request:
+  push:
+    branches: ["main"]
+
+concurrency:
+  group: ios-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-lint-test:
+    runs-on: macos-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Xcode version
+        run: xcodebuild -version
+
+      - name: Detect workspace/project + scheme
+        id: xcode
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          WORKSPACE="$(find . -maxdepth 3 -name "*.xcworkspace" -print -quit || true)"
+          PROJECT="$(find . -maxdepth 3 -name "*.xcodeproj" -print -quit || true)"
+
+          if [[ -n "${WORKSPACE}" ]]; then
+            echo "container_type=workspace" >> "$GITHUB_OUTPUT"
+            echo "container_path=${WORKSPACE}" >> "$GITHUB_OUTPUT"
+            JSON="$(xcodebuild -list -json -workspace "${WORKSPACE}")"
+          elif [[ -n "${PROJECT}" ]]; then
+            echo "container_type=project" >> "$GITHUB_OUTPUT"
+            echo "container_path=${PROJECT}" >> "$GITHUB_OUTPUT"
+            JSON="$(xcodebuild -list -json -project "${PROJECT}")"
+          else
+            echo "ERROR: Could not find an .xcworkspace or .xcodeproj in the repo."
+            echo "Create an Xcode iOS project and commit it, then re-run CI."
+            exit 1
+          fi
+
+          # Pick the first listed scheme. (For real projects you may want to hardcode this.)
+          SCHEME="$(python3 - <<'PY' <<< "${JSON}"
+          import json, sys
+          data = json.loads(sys.stdin.read())
+          root = data.get("workspace") or data.get("project") or {}
+          schemes = root.get("schemes") or []
+          print(schemes[0] if schemes else "")
+          PY
+          )"
+
+          if [[ -z "${SCHEME}" ]]; then
+            echo "ERROR: No schemes found."
+            echo "Make sure you have at least one scheme and it is Shared:"
+            echo "Xcode -> Product -> Scheme -> Manage Schemes -> check 'Shared' -> commit the .xcscheme."
+            exit 1
+          fi
+
+          echo "scheme=${SCHEME}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve Swift Package dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ steps.xcode.outputs.container_type }}" == "workspace" ]]; then
+            xcodebuild -resolvePackageDependencies -workspace "${{ steps.xcode.outputs.container_path }}" -scheme "${{ steps.xcode.outputs.scheme }}"
+          else
+            xcodebuild -resolvePackageDependencies -project "${{ steps.xcode.outputs.container_path }}" -scheme "${{ steps.xcode.outputs.scheme }}"
+          fi
+
+      - name: SwiftLint (optional)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if ! command -v swiftlint >/dev/null 2>&1; then
+            export HOMEBREW_NO_AUTO_UPDATE=1
+            brew install swiftlint
+          fi
+
+          # If you later add `.swiftlint.yml`, SwiftLint will automatically pick it up.
+          swiftlint version
+          swiftlint lint --reporter github-actions-logging
+
+      - name: Build (iOS Simulator, no signing)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          DESTINATION="platform=iOS Simulator,OS=latest,name=iPhone 15"
+          COMMON_ARGS=(
+            -scheme "${{ steps.xcode.outputs.scheme }}"
+            -destination "${DESTINATION}"
+            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_REQUIRED=NO
+            CODE_SIGN_IDENTITY=""
+          )
+
+          if [[ "${{ steps.xcode.outputs.container_type }}" == "workspace" ]]; then
+            xcodebuild build -workspace "${{ steps.xcode.outputs.container_path }}" "${COMMON_ARGS[@]}"
+          else
+            xcodebuild build -project "${{ steps.xcode.outputs.container_path }}" "${COMMON_ARGS[@]}"
+          fi
+
+      - name: Test (unit + UI on Simulator)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          DESTINATION="platform=iOS Simulator,OS=latest,name=iPhone 15"
+          COMMON_ARGS=(
+            -scheme "${{ steps.xcode.outputs.scheme }}"
+            -destination "${DESTINATION}"
+            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_REQUIRED=NO
+            CODE_SIGN_IDENTITY=""
+          )
+
+          if [[ "${{ steps.xcode.outputs.container_type }}" == "workspace" ]]; then
+            xcodebuild test -workspace "${{ steps.xcode.outputs.container_path }}" "${COMMON_ARGS[@]}"
+          else
+            xcodebuild test -project "${{ steps.xcode.outputs.container_path }}" "${COMMON_ARGS[@]}"
+          fi
+
