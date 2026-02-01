@@ -14,14 +14,14 @@ struct WorkoutView: View {
         WorkoutTemplate(name: "Leg Day"),
     ]
 
-    @State private var editorEntryPoint: WorkoutEditorEntryPoint?
+    @State private var path: [WorkoutEditorEntryPoint] = []
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             List {
                 Section {
                     Button {
-                        editorEntryPoint = .startWorkout
+                        path.append(.startWorkout)
                     } label: {
                         Text("Start Workout")
                             .frame(maxWidth: .infinity, alignment: .center)
@@ -31,27 +31,23 @@ struct WorkoutView: View {
 
                 Section("Templates") {
                     ForEach(templates) { template in
-                        HStack {
+                        NavigationLink(value: WorkoutEditorEntryPoint.editTemplate(template)) {
                             Text(template.name)
-                            Spacer()
-                            Image(systemName: "chevron.right")
-                                .foregroundStyle(.tertiary)
                         }
-                        .contentShape(Rectangle())
                     }
                 }
 
                 Section {
                     Button {
-                        editorEntryPoint = .createTemplate
+                        path.append(.createTemplate)
                     } label: {
                         Label("Create Template", systemImage: "plus")
                     }
                 }
             }
             .navigationTitle("Workout")
-            .sheet(item: $editorEntryPoint) { entryPoint in
-                WorkoutEditorPlaceholderView(entryPoint: entryPoint)
+            .navigationDestination(for: WorkoutEditorEntryPoint.self) { entryPoint in
+                WorkoutEditorPlaceholderScreen(entryPoint: entryPoint)
             }
         }
     }
