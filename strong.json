@@ -1,4 +1,6 @@
-[
+{
+  "version": "1.0.0",
+  "exercises": [
   {
     "Exercise Name": "Bench Press (Barbell)"
   },
@@ -680,4 +682,4 @@
   {
     "Exercise Name": "Hanging Knee Raise"
   }
-]
+]}
