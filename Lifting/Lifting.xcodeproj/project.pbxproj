@@ -35,6 +35,21 @@
 			path = Lifting;
 			sourceTree = "<group>";
 		};
+		9F8974E42F2ED50D0030DD72 /* Models */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Models;
+			sourceTree = "<group>";
+		};
+		9F8974E52F2ED50D0030DD72 /* Views */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Views;
+			sourceTree = "<group>";
+		};
+		9F8974E62F2ED50D0030DD72 /* Resources */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		9F8974C82F2ED50D0030DD72 /* LiftingTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = LiftingTests;
@@ -76,6 +91,9 @@
 			isa = PBXGroup;
 			children = (
 				9F8974BA2F2ED50B0030DD72 /* Lifting */,
+				9F8974E42F2ED50D0030DD72 /* Models */,
+				9F8974E52F2ED50D0030DD72 /* Views */,
+				9F8974E62F2ED50D0030DD72 /* Resources */,
 				9F8974C82F2ED50D0030DD72 /* LiftingTests */,
 				9F8974D22F2ED50D0030DD72 /* LiftingUITests */,
 				9F8974B92F2ED50B0030DD72 /* Products */,
@@ -109,9 +127,13 @@
 			);
 			fileSystemSynchronizedGroups = (
 				9F8974BA2F2ED50B0030DD72 /* Lifting */,
+				9F8974E42F2ED50D0030DD72 /* Models */,
+				9F8974E52F2ED50D0030DD72 /* Views */,
+				9F8974E62F2ED50D0030DD72 /* Resources */,
 			);
 			name = Lifting;
 			packageProductDependencies = (
+				9F8974E32F2ED50D0030DD72 /* SQLite */,
 			);
 			productName = Lifting;
 			productReference = 9F8974B82F2ED50B0030DD72 /* Lifting.app */;
@@ -195,6 +217,9 @@
 			);
 			mainGroup = 9F8974AF2F2ED50B0030DD72;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				9F8974E22F2ED50D0030DD72 /* XCRemoteSwiftPackageReference "SQLite.swift" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 9F8974B92F2ED50B0030DD72 /* Products */;
 			projectDirPath = "";
@@ -267,6 +292,25 @@
 			targetProxy = 9F8974D02F2ED50D0030DD72 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		9F8974E22F2ED50D0030DD72 /* XCRemoteSwiftPackageReference "SQLite.swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/stephencelis/SQLite.swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.15.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		9F8974E32F2ED50D0030DD72 /* SQLite */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9F8974E22F2ED50D0030DD72 /* XCRemoteSwiftPackageReference "SQLite.swift" */;
+			productName = SQLite;
+		};
+/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCBuildConfiguration section */
 		9F8974D72F2ED50D0030DD72 /* Debug */ = {
