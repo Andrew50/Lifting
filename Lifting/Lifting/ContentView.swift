@@ -11,8 +11,20 @@ import UIKit
 #endif
 
 struct ContentView: View {
+    private enum AppTab: Hashable {
+        case workout
+        case history
+    }
+
     private let preferredWorkoutTabIconName = "figure.strengthtraining.traditional"
     private let fallbackWorkoutTabIconName = "dumbbell"
+
+    private let preferredHistoryTabIconName = "clock.arrow.circlepath"
+    private let fallbackHistoryTabIconName = "clock"
+
+    @State private var selectedTab: AppTab = .workout
+    @StateObject private var historyStore = WorkoutHistoryStore()
+    @StateObject private var tabReselect = TabReselectCoordinator()
 
     private var workoutTabIconName: String {
 #if canImport(UIKit)
@@ -25,12 +37,37 @@ struct ContentView: View {
 #endif
     }
 
+    private var historyTabIconName: String {
+#if canImport(UIKit)
+        if UIImage(systemName: preferredHistoryTabIconName) != nil {
+            return preferredHistoryTabIconName
+        }
+        return fallbackHistoryTabIconName
+#else
+        return fallbackHistoryTabIconName
+#endif
+    }
+
     var body: some View {
-        TabView {
+        TabView(selection: $selectedTab) {
             WorkoutView()
                 .tabItem {
                     Label("Workout", systemImage: workoutTabIconName)
                 }
+                .tag(AppTab.workout)
+
+            HistoryView(store: historyStore, tabReselect: tabReselect)
+                .tabItem {
+                    Label("History", systemImage: historyTabIconName)
+                }
+                .tag(AppTab.history)
+        }
+        .background {
+#if canImport(UIKit)
+            TabBarReselectObserver(coordinator: tabReselect, historyIndex: 1)
+                .frame(width: 0, height: 0)
+                .allowsHitTesting(false)
+#endif
         }
     }
 }
