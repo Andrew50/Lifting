@@ -59,7 +59,7 @@ class ExerciseDatabase {
     }
     
     func getJSONVersion() -> String? {
-        guard let path = Bundle.main.path(forResource: "exercises", ofType: "json"),
+        guard let path = Bundle.main.path(forResource: "strong", ofType: "json"),
               let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let version = json["version"] as? String else {
@@ -86,21 +86,21 @@ class ExerciseDatabase {
     
     func loadExercisesFromJSON() {
         guard let db = db else { return }
-        
-        if let path = Bundle.main.path(forResource: "exercises", ofType: "json"),
-           let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
-           let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let exerciseList = json["exercises"] as? [[String: String]] {
-           
-           var count = 0
-           for exercise in exerciseList {
-                if let exerciseName = exercise["name"] {
-                    try? db.run(exercises.insert(or: .ignore, name <- exerciseName))
-                    count += 1
-                }
-           }
-           print("Loaded \(count) exercises into database")
-        }
+    
+        if let path = Bundle.main.path(forResource: "strong", ofType: "json"),
+            let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let exerciseList = json["exercises"] as? [[String: String]] {
+       
+       var count = 0
+       for exercise in exerciseList {
+            if let exerciseName = exercise["Exercise Name"] {  // Changed this line
+                try? db.run(exercises.insert(or: .ignore, name <- exerciseName))
+                count += 1
+            }
+       }
+       print("Loaded \(count) exercises into database")
+    }
     }
     
     func getAllExercises() -> [String] {
