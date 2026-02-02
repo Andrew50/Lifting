@@ -284,7 +284,8 @@ final class WorkoutStore: ObservableObject {
                         sortOrder: i,
                         weight: nil,
                         reps: nil,
-                        rir: nil
+                        rir: nil,
+                        isWarmUp: nil
                     )
                     try set.insert(db)
                 }
@@ -351,7 +352,8 @@ final class WorkoutStore: ObservableObject {
                             sortOrder: s.sortOrder,
                             weight: s.weight,
                             reps: s.reps,
-                            rir: s.rir
+                            rir: s.rir,
+                            isWarmUp: s.isWarmUp
                         )
                     }
 
@@ -390,7 +392,8 @@ final class WorkoutStore: ObservableObject {
                 sortOrder: 0,
                 weight: nil,
                 reps: nil,
-                rir: nil
+                rir: nil,
+                isWarmUp: nil
             )
             try set.insert(db)
 
@@ -415,7 +418,8 @@ final class WorkoutStore: ObservableObject {
                 sortOrder: nextOrder,
                 weight: nil,
                 reps: nil,
-                rir: nil
+                rir: nil,
+                isWarmUp: nil
             )
             try set.insert(db)
         }
@@ -453,16 +457,55 @@ final class WorkoutStore: ObservableObject {
         }
     }
 
-    func updateSet(setId: String, weight: Double?, reps: Int?, rir: Double?) throws {
+    func updateSet(setId: String, weight: Double?, reps: Int?, rir: Double?, isWarmUp: Bool? = nil) throws {
         try dbQueue.write { db in
+            let warmUpInt: Int? = isWarmUp.map { $0 ? 1 : 0 }
             try db.execute(
                 sql: """
                 UPDATE workout_sets
-                SET weight = ?, reps = ?, rir = ?
+                SET weight = ?, reps = ?, rir = ?, is_warm_up = ?
                 WHERE id = ?
                 """,
-                arguments: [weight, reps, rir, setId]
+                arguments: [weight, reps, rir, warmUpInt, setId]
             )
+        }
+    }
+
+    /// All performed sets for an exercise across completed workouts, newest first.
+    func fetchExerciseHistory(exerciseId: String) throws -> [ExerciseHistorySetEntry] {
+        try dbQueue.read { db in
+            let sql = """
+            SELECT
+              ws.id AS id,
+              w.id AS workoutId,
+              w.name AS workoutName,
+              w.completed_at AS completedAt,
+              ws.sort_order AS sortOrder,
+              ws.weight AS weight,
+              ws.reps AS reps,
+              ws.rir AS rir,
+              ws.is_warm_up AS isWarmUp
+            FROM workout_sets ws
+            JOIN workout_exercises we ON we.id = ws.workout_exercise_id
+            JOIN workouts w ON w.id = we.workout_id
+            WHERE we.exercise_id = ? AND w.status = 1 AND w.completed_at IS NOT NULL
+            ORDER BY w.completed_at DESC, ws.sort_order ASC
+            """
+            return try Row.fetchAll(db, sql: sql, arguments: [exerciseId]).map { row in
+                let completedAt: TimeInterval = row["completedAt"] ?? 0
+                let isWarmUp: Bool? = (row["isWarmUp"] as Int?).map { $0 != 0 }
+                return ExerciseHistorySetEntry(
+                    id: row["id"],
+                    workoutId: row["workoutId"],
+                    workoutName: row["workoutName"],
+                    completedAt: Date(timeIntervalSince1970: completedAt),
+                    sortOrder: row["sortOrder"],
+                    weight: row["weight"],
+                    reps: row["reps"],
+                    rir: row["rir"],
+                    isWarmUp: isWarmUp
+                )
+            }
         }
     }
 

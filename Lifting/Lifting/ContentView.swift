@@ -72,10 +72,10 @@ struct ContentView: View {
                 workoutStore: container.workoutStore,
                 exerciseStore: container.exerciseStore
             )
-                .tabItem {
-                    Label("Workout", systemImage: workoutTabIconName)
-                }
-                .tag(AppTab.workout)
+            .tabItem {
+                Label("Workout", systemImage: workoutTabIconName)
+            }
+            .tag(AppTab.workout)
 
             HistoryView(
                 historyStore: container.historyStore,
@@ -84,13 +84,13 @@ struct ContentView: View {
                 exerciseStore: container.exerciseStore,
                 tabReselect: tabReselect
             )
-                .tabItem {
-                    Label("History", systemImage: historyTabIconName)
-                }
-                .tag(AppTab.history)
+            .tabItem {
+                Label("History", systemImage: historyTabIconName)
+            }
+            .tag(AppTab.history)
 
             NavigationStack {
-                ExerciseListView()
+                ExerciseListView(container: container)
             }
             .tabItem {
                 Label("Exercises", systemImage: exercisesTabIconName)

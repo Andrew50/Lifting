@@ -84,6 +84,12 @@ enum DatabaseMigrations {
             }
         }
 
+        migrator.registerMigration("v2_add_workout_set_is_warm_up") { db in
+            try db.alter(table: "workout_sets") { t in
+                t.add(column: "is_warm_up", .integer)
+            }
+        }
+
         return migrator
     }()
 }

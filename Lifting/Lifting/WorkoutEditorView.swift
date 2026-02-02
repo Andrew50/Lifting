@@ -98,13 +98,13 @@ struct WorkoutEditorView: View {
         case .template(let templateId):
             do {
                 try templateStore.updateTemplateName(templateId: templateId, name: title)
-            } catch { }
+            } catch {}
             onFinish?() ?? dismiss()
 
         case .workout(let workoutId):
             do {
                 try workoutStore.updateWorkoutName(workoutId: workoutId, name: title)
-            } catch { }
+            } catch {}
             onFinish?() ?? dismiss()
         }
     }
@@ -114,13 +114,13 @@ struct WorkoutEditorView: View {
         case .template(let templateId):
             do {
                 try templateStore.deleteTemplate(templateId: templateId)
-            } catch { }
+            } catch {}
             onFinish?() ?? dismiss()
 
         case .workout(let workoutId):
             do {
                 try workoutStore.deleteWorkout(workoutId: workoutId)
-            } catch { }
+            } catch {}
             onFinish?() ?? dismiss()
         }
     }
@@ -128,14 +128,14 @@ struct WorkoutEditorView: View {
     private func completeAndClose(workoutId: String) {
         do {
             try workoutStore.completeWorkout(workoutId: workoutId)
-        } catch { }
+        } catch {}
         onFinish?() ?? dismiss()
     }
 
     private func discardAndClose(workoutId: String) {
         do {
             try workoutStore.discardPendingWorkout(workoutId: workoutId)
-        } catch { }
+        } catch {}
         onFinish?() ?? dismiss()
     }
 
@@ -145,14 +145,15 @@ struct WorkoutEditorView: View {
         switch subject {
         case .template(let templateId):
             do {
-                try templateStore.addTemplateExercise(templateId: templateId, exerciseId: exercise.id)
-            } catch { }
+                try templateStore.addTemplateExercise(
+                    templateId: templateId, exerciseId: exercise.id)
+            } catch {}
             reloadPreservingTitleEdits()
 
         case .workout(let workoutId):
             do {
                 try workoutStore.addWorkoutExercise(workoutId: workoutId, exerciseId: exercise.id)
-            } catch { }
+            } catch {}
             reloadPreservingTitleEdits()
         }
     }
@@ -224,9 +225,10 @@ struct WorkoutEditorView: View {
             actionBar {
                 Button("Start") {
                     do {
-                        let workoutId = try workoutStore.startPendingWorkout(fromTemplate: templateId)
+                        let workoutId = try workoutStore.startPendingWorkout(
+                            fromTemplate: templateId)
                         activeWorkoutIdToPush = workoutId
-                    } catch { }
+                    } catch {}
                 }
                 .buttonStyle(.borderedProminent)
 
@@ -281,16 +283,19 @@ struct WorkoutEditorView: View {
                 HStack {
                     Text(item.exerciseName)
                     Spacer()
-                    Stepper(value: Binding(
-                        get: { item.plannedSetsCount },
-                        set: { newValue in
-                            let clamped = max(0, newValue)
-                            do {
-                                try templateStore.updatePlannedSets(templateExerciseId: item.id, plannedSetsCount: clamped)
-                            } catch { }
-                            reloadPreservingTitleEdits()
-                        }
-                    ), in: 0...20) {
+                    Stepper(
+                        value: Binding(
+                            get: { item.plannedSetsCount },
+                            set: { newValue in
+                                let clamped = max(0, newValue)
+                                do {
+                                    try templateStore.updatePlannedSets(
+                                        templateExerciseId: item.id, plannedSetsCount: clamped)
+                                } catch {}
+                                reloadPreservingTitleEdits()
+                            }
+                        ), in: 0...20
+                    ) {
                         Text("\(item.plannedSetsCount) sets")
                             .foregroundStyle(.secondary)
                     }
@@ -299,7 +304,7 @@ struct WorkoutEditorView: View {
                     Button(role: .destructive) {
                         do {
                             try templateStore.deleteTemplateExercise(templateExerciseId: item.id)
-                        } catch { }
+                        } catch {}
                         reloadPreservingTitleEdits()
                     } label: {
                         Label("Delete", systemImage: "trash")
@@ -335,8 +340,9 @@ struct WorkoutEditorView: View {
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         Button(role: .destructive) {
                             do {
-                                try workoutStore.deleteWorkoutExercise(workoutExerciseId: exercise.id)
-                            } catch { }
+                                try workoutStore.deleteWorkoutExercise(
+                                    workoutExerciseId: exercise.id)
+                            } catch {}
                             reloadPreservingTitleEdits()
                         } label: {
                             Label("Delete", systemImage: "trash")
@@ -346,17 +352,19 @@ struct WorkoutEditorView: View {
                     ForEach(exercise.sets) { set in
                         WorkoutSetRow(
                             set: set,
-                            onChange: { weight, reps, rir in
+                            onChange: { weight, reps, rir, isWarmUp in
                                 do {
-                                    try workoutStore.updateSet(setId: set.id, weight: weight, reps: reps, rir: rir)
-                                } catch { }
+                                    try workoutStore.updateSet(
+                                        setId: set.id, weight: weight, reps: reps, rir: rir,
+                                        isWarmUp: isWarmUp)
+                                } catch {}
                             }
                         )
                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                             Button(role: .destructive) {
                                 do {
                                     try workoutStore.deleteSet(setId: set.id)
-                                } catch { }
+                                } catch {}
                                 reloadPreservingTitleEdits()
                             } label: {
                                 Label("Delete", systemImage: "trash")
@@ -367,7 +375,7 @@ struct WorkoutEditorView: View {
                     Button {
                         do {
                             try workoutStore.addSet(workoutExerciseId: exercise.id)
-                        } catch { }
+                        } catch {}
                         reloadPreservingTitleEdits()
                     } label: {
                         Label("Add Set", systemImage: "plus")
@@ -388,11 +396,12 @@ struct WorkoutEditorView: View {
 
 private struct WorkoutSetRow: View {
     let set: WorkoutSetDetail
-    let onChange: (_ weight: Double?, _ reps: Int?, _ rir: Double?) -> Void
+    let onChange: (_ weight: Double?, _ reps: Int?, _ rir: Double?, _ isWarmUp: Bool?) -> Void
 
     @State private var weightText: String = ""
     @State private var repsText: String = ""
     @State private var rirText: String = ""
+    @State private var isWarmUp: Bool = false
 
     private func parseDouble(_ text: String) -> Double? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -404,6 +413,10 @@ private struct WorkoutSetRow: View {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
         return Int(trimmed)
+    }
+
+    private func commit() {
+        onChange(parseDouble(weightText), parseInt(repsText), parseDouble(rirText), isWarmUp)
     }
 
     var body: some View {
@@ -424,21 +437,20 @@ private struct WorkoutSetRow: View {
             TextField("RIR", text: $rirText)
                 .keyboardType(.decimalPad)
                 .textFieldStyle(.roundedBorder)
+
+            Toggle("Warm-up", isOn: $isWarmUp)
+                .labelsHidden()
+                .toggleStyle(.button)
         }
         .onAppear {
             weightText = set.weight.map { String($0) } ?? ""
             repsText = set.reps.map { String($0) } ?? ""
             rirText = set.rir.map { String($0) } ?? ""
+            isWarmUp = set.isWarmUp ?? false
         }
-        .onChange(of: weightText) { _, _ in
-            onChange(parseDouble(weightText), parseInt(repsText), parseDouble(rirText))
-        }
-        .onChange(of: repsText) { _, _ in
-            onChange(parseDouble(weightText), parseInt(repsText), parseDouble(rirText))
-        }
-        .onChange(of: rirText) { _, _ in
-            onChange(parseDouble(weightText), parseInt(repsText), parseDouble(rirText))
-        }
+        .onChange(of: weightText) { _, _ in commit() }
+        .onChange(of: repsText) { _, _ in commit() }
+        .onChange(of: rirText) { _, _ in commit() }
+        .onChange(of: isWarmUp) { _, _ in commit() }
     }
 }
-

@@ -140,12 +140,14 @@ struct WorkoutSetRecord: Codable, FetchableRecord, PersistableRecord, TableRecor
     var weight: Double?
     var reps: Int?
     var rir: Double?
+    var isWarmUp: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id
         case workoutExerciseId = "workout_exercise_id"
         case sortOrder = "sort_order"
         case weight, reps, rir
+        case isWarmUp = "is_warm_up"
     }
 
     enum Columns: String, ColumnExpression {
@@ -153,6 +155,7 @@ struct WorkoutSetRecord: Codable, FetchableRecord, PersistableRecord, TableRecor
         case workoutExerciseId = "workout_exercise_id"
         case sortOrder = "sort_order"
         case weight, reps, rir
+        case isWarmUp = "is_warm_up"
     }
 }
 
@@ -183,6 +186,20 @@ struct WorkoutSetDetail: Identifiable, Hashable {
     var weight: Double?
     var reps: Int?
     var rir: Double?
+    var isWarmUp: Bool?
+}
+
+/// One performed set for an exercise, with workout context (for history).
+struct ExerciseHistorySetEntry: Identifiable, Hashable {
+    var id: String
+    var workoutId: String
+    var workoutName: String
+    var completedAt: Date
+    var sortOrder: Int
+    var weight: Double?
+    var reps: Int?
+    var rir: Double?
+    var isWarmUp: Bool?
 }
 
 struct WorkoutExerciseDetail: Identifiable, Hashable {
