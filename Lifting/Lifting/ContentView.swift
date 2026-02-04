@@ -18,6 +18,7 @@ struct ContentView: View {
         case workout
         case history
         case exercises
+        case profile
     }
 
     private let preferredWorkoutTabIconName = "figure.strengthtraining.traditional"
@@ -28,6 +29,9 @@ struct ContentView: View {
 
     private let preferredExercisesTabIconName = "list.bullet"
     private let fallbackExercisesTabIconName = "list.bullet"
+
+    private let preferredProfileTabIconName = "person.circle"
+    private let fallbackProfileTabIconName = "person"
 
     @State private var selectedTab: AppTab = .workout
     @StateObject private var tabReselect = TabReselectCoordinator()
@@ -65,6 +69,17 @@ struct ContentView: View {
         #endif
     }
 
+    private var profileTabIconName: String {
+        #if canImport(UIKit)
+            if UIImage(systemName: preferredProfileTabIconName) != nil {
+                return preferredProfileTabIconName
+            }
+            return fallbackProfileTabIconName
+        #else
+            return fallbackProfileTabIconName
+        #endif
+    }
+
     var body: some View {
         TabView(selection: $selectedTab) {
             WorkoutView(
@@ -96,6 +111,14 @@ struct ContentView: View {
                 Label("Exercises", systemImage: exercisesTabIconName)
             }
             .tag(AppTab.exercises)
+
+            NavigationStack {
+                ProfileView()
+            }
+            .tabItem {
+                Label("Profile", systemImage: profileTabIconName)
+            }
+            .tag(AppTab.profile)
         }
         .background {
             #if canImport(UIKit)

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		9F8974F02F2EF1970030DD72 /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = B1C2D3E4F5A60123456789AB /* GRDB */; };
+		B07247F42F32C808009B5E77 /* SQLite in Frameworks */ = {isa = PBXBuildFile; productRef = 9F8974E32F2ED50D0030DD72 /* SQLite */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -39,6 +40,16 @@
 			path = Lifting;
 			sourceTree = "<group>";
 		};
+		9F8974C82F2ED50D0030DD72 /* LiftingTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = LiftingTests;
+			sourceTree = "<group>";
+		};
+		9F8974D22F2ED50D0030DD72 /* LiftingUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = LiftingUITests;
+			sourceTree = "<group>";
+		};
 		9F8974E42F2ED50D0030DD72 /* Models */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Models;
@@ -54,16 +65,6 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
-		9F8974C82F2ED50D0030DD72 /* LiftingTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = LiftingTests;
-			sourceTree = "<group>";
-		};
-		9F8974D22F2ED50D0030DD72 /* LiftingUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = LiftingUITests;
-			sourceTree = "<group>";
-		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -71,6 +72,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B07247F42F32C808009B5E77 /* SQLite in Frameworks */,
 				9F8974F02F2EF1970030DD72 /* GRDB in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -225,7 +227,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				A1B2C3D4E5F60123456789AB /* XCRemoteSwiftPackageReference "GRDB" */,
-				9F8974E22F2ED50D0030DD72 /* XCRemoteSwiftPackageReference "SQLite.swift" */,
+				9F8974E22F2ED50D0030DD72 /* XCRemoteSwiftPackageReference "SQLite" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 9F8974B92F2ED50B0030DD72 /* Products */;
@@ -299,25 +301,6 @@
 			targetProxy = 9F8974D02F2ED50D0030DD72 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
-
-/* Begin XCRemoteSwiftPackageReference section */
-		9F8974E22F2ED50D0030DD72 /* XCRemoteSwiftPackageReference "SQLite.swift" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/stephencelis/SQLite.swift";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 0.15.0;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
-/* Begin XCSwiftPackageProductDependency section */
-		9F8974E32F2ED50D0030DD72 /* SQLite */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 9F8974E22F2ED50D0030DD72 /* XCRemoteSwiftPackageReference "SQLite.swift" */;
-			productName = SQLite;
-		};
-/* End XCSwiftPackageProductDependency section */
 
 /* Begin XCBuildConfiguration section */
 		9F8974D72F2ED50D0030DD72 /* Debug */ = {
@@ -623,6 +606,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		9F8974E22F2ED50D0030DD72 /* XCRemoteSwiftPackageReference "SQLite" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/stephencelis/SQLite.swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.15.0;
+			};
+		};
 		A1B2C3D4E5F60123456789AB /* XCRemoteSwiftPackageReference "GRDB" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/groue/GRDB.swift";
@@ -634,6 +625,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		9F8974E32F2ED50D0030DD72 /* SQLite */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9F8974E22F2ED50D0030DD72 /* XCRemoteSwiftPackageReference "SQLite" */;
+			productName = SQLite;
+		};
 		B1C2D3E4F5A60123456789AB /* GRDB */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = A1B2C3D4E5F60123456789AB /* XCRemoteSwiftPackageReference "GRDB" */;
