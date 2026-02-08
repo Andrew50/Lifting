@@ -496,6 +496,42 @@ final class WorkoutStore: ObservableObject {
         }
     }
 
+    /// Replace the exercise in a workout exercise slot, keeping the same position. Clears existing sets.
+    func replaceWorkoutExercise(workoutExerciseId: String, newExerciseId: String) throws {
+        let now = Date().timeIntervalSince1970
+        try dbQueue.write { db in
+            // Delete old sets
+            try db.execute(
+                sql: "DELETE FROM workout_sets WHERE workout_exercise_id = ?",
+                arguments: [workoutExerciseId]
+            )
+            // Update exercise_id
+            try db.execute(
+                sql: "UPDATE workout_exercises SET exercise_id = ? WHERE id = ?",
+                arguments: [newExerciseId, workoutExerciseId]
+            )
+            // Insert one empty set
+            try db.execute(
+                sql: """
+                    INSERT INTO workout_sets (id, workout_exercise_id, sort_order, weight, reps, rir)
+                    VALUES (?, ?, 0, NULL, NULL, NULL)
+                    """,
+                arguments: [UUID().uuidString, workoutExerciseId]
+            )
+            // Touch workout updated_at
+            if let workoutId = try String.fetchOne(
+                db,
+                sql: "SELECT workout_id FROM workout_exercises WHERE id = ?",
+                arguments: [workoutExerciseId])
+            {
+                try db.execute(
+                    sql: "UPDATE workouts SET updated_at = ? WHERE id = ?",
+                    arguments: [now, workoutId]
+                )
+            }
+        }
+    }
+
     func updateSet(setId: String, weight: Double?, reps: Int?, rir: Double?, isWarmUp: Bool? = nil)
         throws
     {
