@@ -25,8 +25,6 @@ struct ProfileView: View {
     private let weightOptions = ["lbs", "kg"]
     private let distanceOptions = ["mi", "km"]
     private let restTimeOptions = [60, 90, 120, 150, 180, 240, 300]
-
-    private func restTimeLabel(_ seconds: Int) -> String {
         let min = seconds / 60
         let sec = seconds % 60
         return sec == 0 ? "\(min) min" : "\(min):\(String(format: "%02d", sec))"
