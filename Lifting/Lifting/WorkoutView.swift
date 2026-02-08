@@ -61,7 +61,7 @@ struct WorkoutView: View {
                     }
                 }
             }
-            .navigationTitle("Workout")
+            .navigationTitle("Hi User!")
             .navigationDestination(for: Route.self) { route in
                 switch route {
                 case .template(let templateId):
@@ -83,12 +83,15 @@ struct WorkoutView: View {
                     )
                 }
             }
-            .alert("Error", isPresented: Binding(
-                get: { errorMessage != nil },
-                set: { isPresented in
-                    if !isPresented { errorMessage = nil }
-                }
-            )) {
+            .alert(
+                "Error",
+                isPresented: Binding(
+                    get: { errorMessage != nil },
+                    set: { isPresented in
+                        if !isPresented { errorMessage = nil }
+                    }
+                )
+            ) {
                 Button("OK", role: .cancel) {
                     errorMessage = nil
                 }
@@ -109,4 +112,3 @@ struct WorkoutView_Previews: PreviewProvider {
         )
     }
 }
-
