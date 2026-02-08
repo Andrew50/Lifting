@@ -134,6 +134,20 @@ struct WorkoutView: View {
             )
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
+            .interactiveDismissDisabled(true)
+        }
+        .onAppear {
+            resumePendingWorkoutIfNeeded()
+        }
+    }
+
+    /// Check for a pending workout in the database and auto-present the sheet.
+    private func resumePendingWorkoutIfNeeded() {
+        guard activeWorkoutSheetItem == nil else { return }
+        if let pendingId = try? workoutStore.fetchPendingWorkoutID() {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                activeWorkoutSheetItem = WorkoutSheetItem(workoutId: pendingId)
+            }
         }
     }
 }

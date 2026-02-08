@@ -110,11 +110,12 @@ struct WorkoutRecord: Codable, FetchableRecord, PersistableRecord, TableRecord, 
     var sourceTemplateId: String?
     var startedAt: TimeInterval
     var completedAt: TimeInterval?
+    var notes: String?
     var createdAt: TimeInterval
     var updatedAt: TimeInterval
 
     enum CodingKeys: String, CodingKey {
-        case id, name, status
+        case id, name, status, notes
         case sourceTemplateId = "source_template_id"
         case startedAt = "started_at"
         case completedAt = "completed_at"
@@ -123,7 +124,7 @@ struct WorkoutRecord: Codable, FetchableRecord, PersistableRecord, TableRecord, 
     }
 
     enum Columns: String, ColumnExpression {
-        case id, name, status
+        case id, name, status, notes
         case sourceTemplateId = "source_template_id"
         case startedAt = "started_at"
         case completedAt = "completed_at"

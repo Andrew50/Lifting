@@ -100,6 +100,12 @@ enum DatabaseMigrations {
             }
         }
 
+        migrator.registerMigration("v4_add_workout_notes") { db in
+            try db.alter(table: "workouts") { t in
+                t.add(column: "notes", .text)
+            }
+        }
+
         return migrator
     }()
 }

@@ -40,6 +40,9 @@ struct WorkoutEditorView: View {
     @State private var setCompletedIds: Set<String> = []
     @State private var restTimeEditText: String = ""
     @State private var isEditingRestTime: Bool = false
+    @State private var workoutNotes: String = ""
+    @State private var isShowingNoteEditor: Bool = false
+    @State private var showRestTimePicker: Bool = false
     /// For sheet workout: previous set (weight, reps) per exercise, from most recent completed workout.
     @State private var previousPerformanceByExerciseId: [String: [(weight: Double?, reps: Int?)]] =
         [:]
@@ -78,6 +81,7 @@ struct WorkoutEditorView: View {
                     isPendingWorkout = (workout.status == .pending)
                     workoutStartedAt = workout.startedAt
                     workoutCompletedAt = workout.completedAt
+                    workoutNotes = workout.notes ?? ""
                 } else {
                     if shouldRefreshTitle {
                         title = "Workout"
@@ -86,6 +90,7 @@ struct WorkoutEditorView: View {
                     isPendingWorkout = false
                     workoutStartedAt = nil
                     workoutCompletedAt = nil
+                    workoutNotes = ""
                 }
                 workoutExercises = try workoutStore.fetchWorkoutExercises(workoutId: workoutId)
                 loadPreviousPerformanceForWorkoutExercises()
@@ -319,7 +324,17 @@ struct WorkoutEditorView: View {
                             .fontWeight(.bold)
                             .foregroundStyle(.primary)
                         Spacer()
-                        Button {
+                        Menu {
+                            Button {
+                                isShowingNoteEditor = true
+                            } label: {
+                                Label("Note", systemImage: "note.text")
+                            }
+                            Button {
+                                showRestTimePicker = true
+                            } label: {
+                                Label("Update Rest Timer", systemImage: "clock.arrow.circlepath")
+                            }
                         } label: {
                             Image(systemName: "ellipsis")
                                 .font(.body)
@@ -328,7 +343,6 @@ struct WorkoutEditorView: View {
                                 .background(Color(red: 0.4, green: 0.6, blue: 1.0))
                                 .clipShape(Circle())
                         }
-                        .buttonStyle(.plain)
                     }
 
                     HStack(spacing: 6) {
@@ -361,6 +375,29 @@ struct WorkoutEditorView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
+
+                // Workout notes (shown if not empty)
+                if !workoutNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "note.text")
+                            .font(.caption)
+                            .foregroundStyle(Color(red: 0.4, green: 0.6, blue: 1.0))
+                            .padding(.top, 2)
+                        Text(workoutNotes)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(red: 0.93, green: 0.95, blue: 1.0))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .padding(.horizontal, 20)
+                    .onTapGesture {
+                        isShowingNoteEditor = true
+                    }
+                }
 
                 // Exercises with table layout
                 ForEach(workoutExercises) { exercise in
@@ -456,13 +493,22 @@ struct WorkoutEditorView: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.plain)
-                Button {
+                Menu {
+                    Button {
+                        isShowingNoteEditor = true
+                    } label: {
+                        Label("Note", systemImage: "note.text")
+                    }
+                    Button {
+                        showRestTimePicker = true
+                    } label: {
+                        Label("Update Rest Timer", systemImage: "clock.arrow.circlepath")
+                    }
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.plain)
             }
             .padding(.horizontal, 20)
 
@@ -545,6 +591,25 @@ struct WorkoutEditorView: View {
                                 setId: set.id, weight: weight, reps: reps, rir: nil, isWarmUp: nil)
                         } catch {}
                         reloadPreservingTitleEdits()
+                    },
+                    onSetTypeChanged: { newType in
+                        do {
+                            switch newType {
+                            case .normal:
+                                try workoutStore.updateSet(
+                                    setId: set.id, weight: set.weight, reps: set.reps,
+                                    rir: nil, isWarmUp: false)
+                            case .warmUp:
+                                try workoutStore.updateSet(
+                                    setId: set.id, weight: set.weight, reps: set.reps,
+                                    rir: nil, isWarmUp: true)
+                            case .failure:
+                                try workoutStore.updateSet(
+                                    setId: set.id, weight: set.weight, reps: set.reps,
+                                    rir: 0, isWarmUp: false)
+                            }
+                        } catch {}
+                        reloadPreservingTitleEdits()
                     }
                 )
             }
@@ -616,6 +681,36 @@ struct WorkoutEditorView: View {
                         }
                     }
             }
+        }
+        .sheet(isPresented: $isShowingNoteEditor) {
+            WorkoutNoteEditorSheet(
+                notes: $workoutNotes,
+                onSave: {
+                    if case .workout(let workoutId) = subject {
+                        try? workoutStore.updateWorkoutNotes(
+                            workoutId: workoutId,
+                            notes: workoutNotes.trimmingCharacters(in: .whitespacesAndNewlines)
+                                .isEmpty
+                                ? nil : workoutNotes
+                        )
+                    }
+                    isShowingNoteEditor = false
+                },
+                onCancel: {
+                    isShowingNoteEditor = false
+                }
+            )
+            .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $showRestTimePicker) {
+            RestTimePickerSheet(
+                restTimeSeconds: $restTimeSeconds,
+                onDone: {
+                    restTimeEditText = restTimeFormatted
+                    showRestTimePicker = false
+                }
+            )
+            .presentationDetents([.height(260)])
         }
         .navigationDestination(item: $activeWorkoutIdToPush) { workoutId in
             WorkoutEditorView(
@@ -802,6 +897,19 @@ struct WorkoutEditorView: View {
     }
 }
 
+/// Represents the type of a set: normal, warm-up, or failure.
+private enum SetType: CaseIterable {
+    case normal, warmUp, failure
+
+    var next: SetType {
+        switch self {
+        case .normal: return .warmUp
+        case .warmUp: return .failure
+        case .failure: return .normal
+        }
+    }
+}
+
 private struct SheetSetRow: View {
     let set: WorkoutSetDetail
     /// Previous performance for this set (e.g. "50 × 10" or "—").
@@ -809,9 +917,12 @@ private struct SheetSetRow: View {
     let isCompleted: Bool
     let onToggleComplete: () -> Void
     let onChange: (Double?, Int?, Double?, Bool?) -> Void
+    /// Called when the set type (warm-up / failure) changes.
+    let onSetTypeChanged: (SetType) -> Void
 
     @State private var weightText: String = ""
     @State private var repsText: String = ""
+    @State private var setType: SetType = .normal
 
     private func parseDouble(_ text: String) -> Double? {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -829,12 +940,52 @@ private struct SheetSetRow: View {
         onChange(parseDouble(weightText), parseInt(repsText), nil, nil)
     }
 
+    /// The label shown in the set number column.
+    private var setLabel: String {
+        switch setType {
+        case .normal: return "\(set.sortOrder + 1)"
+        case .warmUp: return "W"
+        case .failure: return "F"
+        }
+    }
+
+    /// Color for the set label.
+    private var setLabelColor: Color {
+        switch setType {
+        case .normal: return .primary
+        case .warmUp: return Color(red: 0.2, green: 0.72, blue: 0.4)
+        case .failure: return Color(red: 0.9, green: 0.25, blue: 0.25)
+        }
+    }
+
+    /// Background color for the set label badge.
+    private var setLabelBackground: Color {
+        switch setType {
+        case .normal: return .clear
+        case .warmUp: return Color(red: 0.2, green: 0.72, blue: 0.4).opacity(0.15)
+        case .failure: return Color(red: 0.9, green: 0.25, blue: 0.25).opacity(0.15)
+        }
+    }
+
     var body: some View {
         HStack(spacing: 0) {
-            Text("\(set.sortOrder + 1)")
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .frame(width: 36, alignment: .leading)
+            // Tappable set type badge
+            Button {
+                withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
+                    setType = setType.next
+                }
+                onSetTypeChanged(setType)
+            } label: {
+                Text(setLabel)
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundStyle(setLabelColor)
+                    .frame(width: 30, height: 30)
+                    .background(setLabelBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .frame(width: 36, alignment: .leading)
 
             Text(previousText)
                 .font(.subheadline)
@@ -876,6 +1027,14 @@ private struct SheetSetRow: View {
             weightText =
                 set.weight.map { $0 == Double(Int($0)) ? String(Int($0)) : String($0) } ?? ""
             repsText = set.reps.map { String($0) } ?? ""
+            // Restore set type from model
+            if set.isWarmUp == true {
+                setType = .warmUp
+            } else if set.rir == 0 {
+                setType = .failure
+            } else {
+                setType = .normal
+            }
         }
         .onChange(of: weightText) { _, _ in commit() }
         .onChange(of: repsText) { _, _ in commit() }
@@ -940,6 +1099,115 @@ private struct WorkoutSetRow: View {
         .onChange(of: repsText) { _, _ in commit() }
         .onChange(of: rirText) { _, _ in commit() }
         .onChange(of: isWarmUp) { _, _ in commit() }
+    }
+}
+
+// MARK: - Note Editor Sheet
+
+private struct WorkoutNoteEditorSheet: View {
+    @Binding var notes: String
+    let onSave: () -> Void
+    let onCancel: () -> Void
+
+    @State private var draft: String = ""
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Workout Note")
+                    .font(.headline)
+                    .padding(.horizontal, 20)
+
+                TextEditor(text: $draft)
+                    .font(.body)
+                    .padding(12)
+                    .scrollContentBackground(.hidden)
+                    .background(Color(.systemGray6))
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .padding(.horizontal, 20)
+                    .frame(minHeight: 120)
+
+                Spacer()
+            }
+            .padding(.top, 20)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { onCancel() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        notes = draft
+                        onSave()
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+        }
+        .onAppear {
+            draft = notes
+        }
+    }
+}
+
+// MARK: - Rest Time Picker Sheet
+
+private struct RestTimePickerSheet: View {
+    @Binding var restTimeSeconds: Int
+    let onDone: () -> Void
+
+    private let options = [30, 45, 60, 90, 120, 150, 180, 240, 300]
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Rest Time Between Sets")
+                    .font(.headline)
+                    .padding(.horizontal, 20)
+
+                LazyVGrid(
+                    columns: [
+                        GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible()),
+                    ], spacing: 12
+                ) {
+                    ForEach(options, id: \.self) { seconds in
+                        let isSelected = restTimeSeconds == seconds
+                        Button {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                restTimeSeconds = seconds
+                            }
+                        } label: {
+                            Text(
+                                seconds < 60
+                                    ? "\(seconds)s"
+                                    : "\(seconds / 60):\(String(format: "%02d", seconds % 60))"
+                            )
+                            .font(.body)
+                            .fontWeight(isSelected ? .bold : .regular)
+                            .foregroundStyle(isSelected ? .white : .primary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(
+                                isSelected
+                                    ? Color(red: 0.2, green: 0.4, blue: 1.0)
+                                    : Color(.systemGray6)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 20)
+
+                Spacer()
+            }
+            .padding(.top, 20)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { onDone() }
+                        .fontWeight(.semibold)
+                }
+            }
+        }
     }
 }
 

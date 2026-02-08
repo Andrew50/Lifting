@@ -171,7 +171,8 @@ final class HistoryStore: ObservableObject {
 
     private func startObservingHistory() {
         let observation = ValueObservation.tracking { db in
-            let records = try WorkoutRecord
+            let records =
+                try WorkoutRecord
                 .filter(WorkoutRecord.Columns.status == WorkoutStatus.completed.rawValue)
                 .order(WorkoutRecord.Columns.completedAt.desc, WorkoutRecord.Columns.startedAt.desc)
                 .fetchAll(db)
@@ -180,17 +181,18 @@ final class HistoryStore: ObservableObject {
                 guard let completedAt = workout.completedAt else { return nil }
 
                 let exercisesSql = """
-                SELECT
-                    we.id,
-                    e.name,
-                    (SELECT COUNT(*) FROM workout_sets ws WHERE ws.workout_exercise_id = we.id) as setsCount
-                FROM workout_exercises we
-                JOIN exercises e ON e.id = we.exercise_id
-                WHERE we.workout_id = ?
-                ORDER BY we.sort_order ASC
-                """
+                    SELECT
+                        we.id,
+                        e.name,
+                        (SELECT COUNT(*) FROM workout_sets ws WHERE ws.workout_exercise_id = we.id) as setsCount
+                    FROM workout_exercises we
+                    JOIN exercises e ON e.id = we.exercise_id
+                    WHERE we.workout_id = ?
+                    ORDER BY we.sort_order ASC
+                    """
 
-                let exercises = try Row.fetchAll(db, sql: exercisesSql, arguments: [workout.id]).map { row in
+                let exercises = try Row.fetchAll(db, sql: exercisesSql, arguments: [workout.id]).map
+                { row in
                     WorkoutExerciseSummary(
                         id: row["id"],
                         name: row["name"],
@@ -258,6 +260,7 @@ final class WorkoutStore: ObservableObject {
             sourceTemplateId: nil,
             startedAt: now,
             completedAt: nil,
+            notes: nil,
             createdAt: now,
             updatedAt: now
         )
@@ -285,6 +288,7 @@ final class WorkoutStore: ObservableObject {
                 sourceTemplateId: templateId,
                 startedAt: now,
                 completedAt: nil,
+                notes: nil,
                 createdAt: now,
                 updatedAt: now
             )
@@ -552,6 +556,16 @@ final class WorkoutStore: ObservableObject {
             try db.execute(
                 sql: "UPDATE workouts SET name = ?, updated_at = ? WHERE id = ?",
                 arguments: [name, now, workoutId]
+            )
+        }
+    }
+
+    func updateWorkoutNotes(workoutId: String, notes: String?) throws {
+        let now = Date().timeIntervalSince1970
+        try dbQueue.write { db in
+            try db.execute(
+                sql: "UPDATE workouts SET notes = ?, updated_at = ? WHERE id = ?",
+                arguments: [notes, now, workoutId]
             )
         }
     }
