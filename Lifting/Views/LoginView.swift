@@ -6,10 +6,13 @@
 import SwiftUI
 
 struct LoginView: View {
+    @ObservedObject var authStore: AuthStore
     var dismissSheet: (() -> Void)?
 
     @State private var email: String = ""
     @State private var password: String = ""
+    @State private var errorMessage: String?
+    @State private var isLoading = false
     @FocusState private var focusedField: Field?
 
     private enum Field {
@@ -41,7 +44,7 @@ struct LoginView: View {
                         .background(AuthTheme.primary.opacity(0.15))
                         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     NavigationLink {
-                        CreateAccountView(dismissSheet: dismissSheet)
+                        CreateAccountView(authStore: authStore, dismissSheet: dismissSheet)
                     } label: {
                         Text("No")
                             .font(.subheadline)
@@ -55,6 +58,16 @@ struct LoginView: View {
                 }
                 .padding(.horizontal, 24)
                 .padding(.bottom, 24)
+
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(.subheadline)
+                        .foregroundStyle(.red)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 12)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("EMAIL")
@@ -103,13 +116,22 @@ struct LoginView: View {
                 .padding(.horizontal, 24)
                 .padding(.bottom, 20)
 
-                Button("Log in") {
-                    // Log in
+                Button {
+                    handleLogIn()
+                } label: {
+                    if isLoading {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Text("Log in")
+                    }
                 }
                 .buttonStyle(PrimaryAuthButtonStyle())
+                .disabled(isLoading)
                 .padding(.horizontal, 24)
                 .padding(.bottom, 32)
             }
+            .animation(.easeInOut(duration: 0.25), value: errorMessage)
         }
         .scrollDismissesKeyboard(.interactively)
         .navigationBarTitleDisplayMode(.inline)
@@ -123,10 +145,24 @@ struct LoginView: View {
             }
         }
     }
+
+    private func handleLogIn() {
+        focusedField = nil
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            try authStore.logIn(email: email, password: password)
+            dismissSheet?()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isLoading = false
+    }
 }
 
 #Preview {
     NavigationStack {
-        LoginView()
+        LoginView(authStore: AppContainer().authStore)
     }
 }

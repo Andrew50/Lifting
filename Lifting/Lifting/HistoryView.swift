@@ -62,7 +62,8 @@ struct HistoryView: View {
                         workoutStore: workoutStore,
                         exerciseStore: exerciseStore,
                         subject: .workout(id: workoutId),
-                        onFinish: { path.removeAll() }
+                        onFinish: { path.removeAll() },
+                        restTimeSeconds: .constant(120)
                     )
                 }
             }
