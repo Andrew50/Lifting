@@ -170,6 +170,14 @@ struct WorkoutSummary: Identifiable, Hashable {
     var id: String
     var name: String
     var completedAt: Date
+    var duration: TimeInterval
+    var exercises: [WorkoutExerciseSummary]
+}
+
+struct WorkoutExerciseSummary: Identifiable, Hashable {
+    var id: String
+    var name: String
+    var setsCount: Int
 }
 
 struct TemplateExerciseDetail: Identifiable, Hashable {

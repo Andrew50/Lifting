@@ -27,29 +27,22 @@ struct HistoryView: View {
     var body: some View {
         NavigationStack(path: $path) {
             ScrollViewReader { proxy in
-                List {
-                    Color.clear
-                        .frame(height: 1)
-                        .id(ScrollAnchor.top)
-                        .accessibilityHidden(true)
-                        .listRowInsets(EdgeInsets())
-                        .listRowSeparator(.hidden)
+                ScrollView {
+                    LazyVStack(spacing: 16) {
+                        Color.clear
+                            .frame(height: 1)
+                            .id(ScrollAnchor.top)
+                            .accessibilityHidden(true)
 
-                    ForEach(historyStore.workouts) { workout in
-                        NavigationLink(value: Route.workout(workout.id)) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(workout.name)
-                                    .font(.body.weight(.medium))
-
-                                Text(workout.completedAt, format: .dateTime.year().month().day())
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
+                        ForEach(historyStore.workouts) { workout in
+                            NavigationLink(value: Route.workout(workout.id)) {
+                                WorkoutHistoryBubble(workout: workout)
                             }
-                            .padding(.vertical, 4)
+                            .buttonStyle(.plain)
                         }
                     }
+                    .padding()
                 }
-                .listStyle(.plain)
                 .navigationTitle("History")
                 .onChange(of: tabReselect.historyReselectCount) { _, _ in
                     if !path.isEmpty {
@@ -73,6 +66,50 @@ struct HistoryView: View {
                     )
                 }
             }
+        }
+    }
+}
+
+struct WorkoutHistoryBubble: View {
+    let workout: WorkoutSummary
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(workout.name)
+                .font(.body.weight(.bold))
+
+            Text("\(workout.completedAt.formatted(.dateTime.month(.defaultDigits).day(.defaultDigits).year(.twoDigits))). \(formatDuration(workout.duration))")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+
+            Rectangle()
+                .fill(Color.secondary.opacity(0.3))
+                .frame(height: 1)
+                .padding(.vertical, 4)
+
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(workout.exercises) { exercise in
+                    Text("\(exercise.setsCount)x \(exercise.name)")
+                        .font(.footnote)
+                }
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let totalSeconds = Int(duration)
+        let hours = totalSeconds / 3600
+        let minutes = (totalSeconds % 3600) / 60
+        let seconds = totalSeconds % 60
+
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
+        } else {
+            return String(format: "%d:%02d", minutes, seconds)
         }
     }
 }

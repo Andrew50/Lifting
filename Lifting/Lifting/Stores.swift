@@ -168,18 +168,41 @@ final class HistoryStore: ObservableObject {
 
     private func startObservingHistory() {
         let observation = ValueObservation.tracking { db in
-            try WorkoutRecord
+            let records = try WorkoutRecord
                 .filter(WorkoutRecord.Columns.status == WorkoutStatus.completed.rawValue)
                 .order(WorkoutRecord.Columns.completedAt.desc, WorkoutRecord.Columns.startedAt.desc)
                 .fetchAll(db)
-                .compactMap { workout -> WorkoutSummary? in
-                    guard let completedAt = workout.completedAt else { return nil }
-                    return WorkoutSummary(
-                        id: workout.id,
-                        name: workout.name,
-                        completedAt: Date(timeIntervalSince1970: completedAt)
+
+            return try records.compactMap { workout -> WorkoutSummary? in
+                guard let completedAt = workout.completedAt else { return nil }
+
+                let exercisesSql = """
+                SELECT
+                    we.id,
+                    e.name,
+                    (SELECT COUNT(*) FROM workout_sets ws WHERE ws.workout_exercise_id = we.id) as setsCount
+                FROM workout_exercises we
+                JOIN exercises e ON e.id = we.exercise_id
+                WHERE we.workout_id = ?
+                ORDER BY we.sort_order ASC
+                """
+
+                let exercises = try Row.fetchAll(db, sql: exercisesSql, arguments: [workout.id]).map { row in
+                    WorkoutExerciseSummary(
+                        id: row["id"],
+                        name: row["name"],
+                        setsCount: row["setsCount"]
                     )
                 }
+
+                return WorkoutSummary(
+                    id: workout.id,
+                    name: workout.name,
+                    completedAt: Date(timeIntervalSince1970: completedAt),
+                    duration: completedAt - workout.startedAt,
+                    exercises: exercises
+                )
+            }
         }
 
         cancellable = observation
