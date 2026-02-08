@@ -26,47 +26,23 @@ struct LoginView: View {
                     .font(.title)
                     .fontWeight(.bold)
                     .foregroundStyle(AuthTheme.primary)
-                    .padding(.top, 32)
-                    .padding(.bottom, 16)
-
-                Text("Do you already have an account?")
-                    .font(.subheadline)
-                    .foregroundStyle(AuthTheme.subtitleGray)
-                    .padding(.bottom, 12)
-
-                HStack(spacing: 16) {
-                    Text("Yes")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundStyle(AuthTheme.primary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(AuthTheme.primary.opacity(0.15))
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    NavigationLink {
-                        CreateAccountView(authStore: authStore, dismissSheet: dismissSheet)
-                    } label: {
-                        Text("No")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundStyle(AuthTheme.primary)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(AuthTheme.socialButtonBackground)
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    }
-                }
-                .padding(.horizontal, 24)
-                .padding(.bottom, 24)
+                    .padding(.top, 48)
+                    .padding(.bottom, 32)
 
                 if let errorMessage {
-                    Text(errorMessage)
-                        .font(.subheadline)
-                        .foregroundStyle(.red)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 12)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                        Text(errorMessage)
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.white)
+                    .padding(.vertical, 12)
+                    .padding(.horizontal, 16)
+                    .background(Color.red.opacity(0.8))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 24)
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -130,6 +106,20 @@ struct LoginView: View {
                 .disabled(isLoading)
                 .padding(.horizontal, 24)
                 .padding(.bottom, 32)
+
+                HStack(spacing: 4) {
+                    Text("Don't have an account?")
+                        .foregroundStyle(AuthTheme.subtitleGray)
+                    NavigationLink {
+                        CreateAccountView(authStore: authStore, dismissSheet: dismissSheet)
+                    } label: {
+                        Text("Sign up here.")
+                            .fontWeight(.semibold)
+                            .foregroundStyle(AuthTheme.primary)
+                    }
+                }
+                .font(.subheadline)
+                .padding(.bottom, 24)
             }
             .animation(.easeInOut(duration: 0.25), value: errorMessage)
         }

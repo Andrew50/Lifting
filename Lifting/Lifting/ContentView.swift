@@ -114,7 +114,7 @@ struct ContentView: View {
             .tag(AppTab.exercises)
 
             NavigationStack {
-                ProfileView(authStore: container.authStore)
+                ProfileView(container: container, authStore: container.authStore)
             }
             .tabItem {
                 Label("Profile", systemImage: profileTabIconName)

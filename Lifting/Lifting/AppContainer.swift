@@ -17,6 +17,7 @@ final class AppContainer: ObservableObject {
     let historyStore: HistoryStore
     let exerciseStore: ExerciseStore
     let authStore: AuthStore
+    let csvImporter: CSVImporter
 
     init() {
         do {
@@ -30,6 +31,7 @@ final class AppContainer: ObservableObject {
         historyStore = HistoryStore(db: db)
         exerciseStore = ExerciseStore(db: db)
         authStore = AuthStore(db: db)
+        csvImporter = CSVImporter(db: db)
     }
 }
 

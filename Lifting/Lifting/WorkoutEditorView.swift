@@ -43,9 +43,16 @@ struct WorkoutEditorView: View {
     @State private var workoutNotes: String = ""
     @State private var isShowingNoteEditor: Bool = false
     @State private var showRestTimePicker: Bool = false
+    @State private var showCancelConfirmation: Bool = false
     /// For sheet workout: previous set (weight, reps) per exercise, from most recent completed workout.
     @State private var previousPerformanceByExerciseId: [String: [(weight: Double?, reps: Int?)]] =
         [:]
+
+    struct ExerciseHistorySelection: Identifiable {
+        let id: String
+        let name: String
+    }
+    @State private var selectedExerciseForHistory: ExerciseHistorySelection?
 
     // MARK: - Load
 
@@ -428,8 +435,7 @@ struct WorkoutEditorView: View {
                 if isPendingWorkout {
                     // Cancel Workout button (pending only)
                     Button {
-                        discardAndClose(workoutId: workoutId)
-                        onFinish?()
+                        showCancelConfirmation = true
                     } label: {
                         Text("Cancel Workout")
                             .font(.headline)
@@ -441,6 +447,19 @@ struct WorkoutEditorView: View {
                     }
                     .buttonStyle(ScaleButtonStyle())
                     .padding(.horizontal, 20)
+                    .alert(
+                        "Cancel Workout?",
+                        isPresented: $showCancelConfirmation
+                    ) {
+                        Button("Cancel Workout", role: .destructive) {
+                            if case .workout(let workoutId) = subject {
+                                discardAndClose(workoutId: workoutId)
+                            }
+                        }
+                        Button("Keep Working", role: .cancel) {}
+                    } message: {
+                        Text("Are you sure you want to cancel this workout? All progress will be lost.")
+                    }
                 } else {
                     // Save + Delete for completed workouts
                     Button {
@@ -482,9 +501,15 @@ struct WorkoutEditorView: View {
         VStack(alignment: .leading, spacing: 12) {
             // Exercise name (blue) + icons
             HStack {
-                Text(exercise.exerciseName)
-                    .font(.headline)
-                    .foregroundStyle(Color(red: 0.2, green: 0.4, blue: 1.0))
+                Button {
+                    selectedExerciseForHistory = ExerciseHistorySelection(id: exercise.exerciseId, name: exercise.exerciseName)
+                } label: {
+                    Text(exercise.exerciseName)
+                        .font(.headline)
+                        .foregroundStyle(Color(red: 0.2, green: 0.4, blue: 1.0))
+                }
+                .buttonStyle(.plain)
+
                 Spacer()
                 Button {
                 } label: {
@@ -588,7 +613,12 @@ struct WorkoutEditorView: View {
                     onChange: { weight, reps, _, _ in
                         do {
                             try workoutStore.updateSet(
-                                setId: set.id, weight: weight, reps: reps, rir: nil, isWarmUp: nil)
+                                setId: set.id,
+                                weight: weight,
+                                reps: reps,
+                                rir: set.rir,
+                                isWarmUp: set.isWarmUp
+                            )
                         } catch {}
                         reloadPreservingTitleEdits()
                     },
@@ -602,7 +632,7 @@ struct WorkoutEditorView: View {
                             case .warmUp:
                                 try workoutStore.updateSet(
                                     setId: set.id, weight: set.weight, reps: set.reps,
-                                    rir: nil, isWarmUp: true)
+                                    rir: set.rir, isWarmUp: true)
                             case .failure:
                                 try workoutStore.updateSet(
                                     setId: set.id, weight: set.weight, reps: set.reps,
@@ -732,6 +762,15 @@ struct WorkoutEditorView: View {
                 restTimeEditText = restTimeFormatted
             }
         }
+        .sheet(item: $selectedExerciseForHistory) { selection in
+            NavigationStack {
+                ExerciseHistoryView(
+                    exerciseId: selection.id,
+                    exerciseName: selection.name,
+                    workoutStore: workoutStore
+                )
+            }
+        }
     }
 
     @ToolbarContentBuilder
@@ -836,8 +875,14 @@ struct WorkoutEditorView: View {
             ForEach(workoutExercises) { exercise in
                 Section {
                     HStack {
-                        Text(exercise.exerciseName)
-                            .font(.headline)
+                        Button {
+                            selectedExerciseForHistory = ExerciseHistorySelection(id: exercise.exerciseId, name: exercise.exerciseName)
+                        } label: {
+                            Text(exercise.exerciseName)
+                                .font(.headline)
+                        }
+                        .buttonStyle(.plain)
+
                         Spacer()
                     }
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {

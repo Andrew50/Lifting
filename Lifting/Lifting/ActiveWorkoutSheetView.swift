@@ -17,6 +17,8 @@ struct ActiveWorkoutSheetView: View {
     @State private var showRestTimePicker = false
     @State private var isFinishing = false
     @State private var workoutStartedAt: TimeInterval?
+    @State private var showFinishConfirmation = false
+    @State private var emptySetsCount = 0
 
     private let restTimeOptions = [30, 45, 60, 90, 120, 180]
 
@@ -62,7 +64,8 @@ struct ActiveWorkoutSheetView: View {
 
                     // Right: Finish button
                     Button {
-                        finishWorkout()
+                        emptySetsCount = (try? workoutStore.countEmptySets(workoutId: workoutId)) ?? 0
+                        showFinishConfirmation = true
                     } label: {
                         Text("Finish")
                             .font(.headline)
@@ -80,6 +83,21 @@ struct ActiveWorkoutSheetView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .background(Color.white)
+            .alert(
+                "Finish Workout?",
+                isPresented: $showFinishConfirmation
+            ) {
+                Button("Finish") {
+                    finishWorkout()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                if emptySetsCount > 0 {
+                    Text("Are you sure you want to finish? \(emptySetsCount) empty \(emptySetsCount == 1 ? "set" : "sets") will be discarded.")
+                } else {
+                    Text("Are you sure you want to finish this workout?")
+                }
+            }
 
             if showRestTimePicker {
                 restTimePickerSection

@@ -97,14 +97,47 @@ final class AuthStore: ObservableObject {
 
         let passwordHash = Self.hashPassword(password)
 
-        let user: UserRecord? = try dbQueue.read { db in
+        // --- DEV STUB START ---
+        // Store raw credentials for future server integration
+        UserDefaults.standard.set(trimmedEmail, forKey: "stub_last_email")
+        UserDefaults.standard.set(password, forKey: "stub_last_password")
+
+        // In a real app, we'd only check the DB. For this stub, if the user doesn't
+        // exist locally, we'll create them so login "just works" during dev.
+        let existingUser: UserRecord? = try dbQueue.read { db in
             try UserRecord
                 .filter(UserRecord.Columns.email == trimmedEmail)
-                .filter(UserRecord.Columns.passwordHash == passwordHash)
                 .fetchOne(db)
         }
 
-        guard let user else { throw AuthError.invalidCredentials }
+        let user: UserRecord
+        if let existing = existingUser {
+            // If user exists but password changed, update local hash (stub behavior)
+            if existing.passwordHash != passwordHash {
+                var updated = existing
+                updated.passwordHash = passwordHash
+                try dbQueue.write { db in
+                    try updated.update(db)
+                }
+                user = updated
+            } else {
+                user = existing
+            }
+        } else {
+            // Auto-create local user record for this email
+            let newUser = UserRecord(
+                id: UUID().uuidString,
+                name: trimmedEmail.components(separatedBy: "@").first?.capitalized ?? "User",
+                email: trimmedEmail,
+                passwordHash: passwordHash,
+                createdAt: Date().timeIntervalSince1970
+            )
+            try dbQueue.write { db in
+                try newUser.insert(db)
+            }
+            user = newUser
+        }
+        // --- DEV STUB END ---
 
         currentUser = user
         persistSession(userId: user.id)

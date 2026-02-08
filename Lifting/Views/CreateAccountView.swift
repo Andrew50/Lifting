@@ -44,13 +44,19 @@ struct CreateAccountView: View {
                 .padding(.bottom, 28)
 
                 if let errorMessage {
-                    Text(errorMessage)
-                        .font(.subheadline)
-                        .foregroundStyle(.red)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 12)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    HStack(spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                        Text(errorMessage)
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.white)
+                    .padding(.vertical, 12)
+                    .padding(.horizontal, 16)
+                    .background(Color.red.opacity(0.8))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 24)
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
                 }
 
                 VStack(alignment: .leading, spacing: 8) {

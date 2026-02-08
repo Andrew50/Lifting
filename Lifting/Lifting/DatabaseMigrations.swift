@@ -106,6 +106,21 @@ enum DatabaseMigrations {
             }
         }
 
+        migrator.registerMigration("v5_add_csv_import_fields") { db in
+            try db.alter(table: "workout_sets") { t in
+                t.add(column: "distance", .double)
+                t.add(column: "seconds", .double)
+                t.add(column: "notes", .text)
+                t.add(column: "rpe", .double)
+            }
+        }
+
+        migrator.registerMigration("v6_add_rest_timer_to_sets") { db in
+            try db.alter(table: "workout_sets") { t in
+                t.add(column: "rest_timer_seconds", .integer)
+            }
+        }
+
         return migrator
     }()
 }

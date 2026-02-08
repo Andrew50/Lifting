@@ -39,6 +39,8 @@ struct ExerciseHistoryView: View {
         return result
     }
 
+    @Environment(\.dismiss) private var dismiss
+
     var body: some View {
         Group {
             if loadError {
@@ -54,26 +56,45 @@ struct ExerciseHistoryView: View {
                     description: Text("Complete workouts with this exercise to see sets, weights, and dates here.")
                 )
             } else {
-                List {
-                    ForEach(groupedByWorkout, id: \.workoutId) { group in
-                        Section {
-                            ForEach(group.sets) { set in
-                                HistorySetRow(entry: set)
-                            }
-                        } header: {
-                            HStack {
-                                Text(group.name)
-                                Spacer()
-                                Text(formatDate(group.date))
-                                    .foregroundStyle(.secondary)
+                ScrollView {
+                    LazyVStack(spacing: 16) {
+                        ForEach(groupedByWorkout, id: \.workoutId) { group in
+                            HistoryBubble {
+                                HistoryBubbleHeader(
+                                    title: group.name,
+                                    subtitle: formatDate(group.date)
+                                )
+
+                                HistoryDivider()
+
+                                VStack(spacing: 0) {
+                                    ForEach(group.sets) { set in
+                                        HistorySetRow(
+                                            setNumber: set.sortOrder + 1,
+                                            weight: set.weight,
+                                            reps: set.reps,
+                                            rir: set.rir,
+                                            isWarmUp: set.isWarmUp,
+                                            restTimerSeconds: set.restTimerSeconds
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
+                    .padding()
                 }
             }
         }
         .navigationTitle(exerciseName)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("Close") {
+                    dismiss()
+                }
+            }
+        }
         .onAppear {
             loadHistory()
         }
@@ -94,58 +115,6 @@ struct ExerciseHistoryView: View {
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
         return formatter.string(from: date)
-    }
-}
-
-private struct HistorySetRow: View {
-    let entry: ExerciseHistorySetEntry
-
-    private var isFailure: Bool {
-        guard let rir = entry.rir else { return false }
-        return rir == 0
-    }
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            Text("Set \(entry.sortOrder + 1)")
-                .font(.subheadline.monospacedDigit())
-                .foregroundStyle(.secondary)
-                .frame(width: 44, alignment: .leading)
-
-            if let w = entry.weight {
-                Text(String(format: "%.1f kg", w))
-                    .font(.body.monospacedDigit())
-            } else {
-                Text("—")
-                    .foregroundStyle(.tertiary)
-            }
-
-            if let r = entry.reps {
-                Text("× \(r) reps")
-                    .font(.body.monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            if entry.isWarmUp == true {
-                Text("Warm-up")
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(.orange.opacity(0.2))
-                    .clipShape(Capsule())
-            }
-            if isFailure {
-                Text("Failure")
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(.red.opacity(0.2))
-                    .clipShape(Capsule())
-            }
-        }
-        .padding(.vertical, 2)
     }
 }
 

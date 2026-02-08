@@ -75,30 +75,16 @@ struct WorkoutHistoryBubble: View {
     let workout: WorkoutSummary
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(workout.name)
-                .font(.body.weight(.bold))
+        HistoryBubble {
+            HistoryBubbleHeader(
+                title: workout.name,
+                subtitle: "\(workout.completedAt.formatted(.dateTime.month(.defaultDigits).day(.defaultDigits).year(.twoDigits))). \(formatDuration(workout.duration))"
+            )
 
-            Text("\(workout.completedAt.formatted(.dateTime.month(.defaultDigits).day(.defaultDigits).year(.twoDigits))). \(formatDuration(workout.duration))")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+            HistoryDivider()
 
-            Rectangle()
-                .fill(Color.secondary.opacity(0.3))
-                .frame(height: 1)
-                .padding(.vertical, 4)
-
-            VStack(alignment: .leading, spacing: 2) {
-                ForEach(workout.exercises) { exercise in
-                    Text("\(exercise.setsCount)x \(exercise.name)")
-                        .font(.footnote)
-                }
-            }
+            HistoryWorkoutSummaryContent(exercises: workout.exercises)
         }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     private func formatDuration(_ duration: TimeInterval) -> String {

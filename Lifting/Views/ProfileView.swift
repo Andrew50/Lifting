@@ -4,10 +4,17 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ProfileView: View {
+    @ObservedObject var container: AppContainer
     @ObservedObject var authStore: AuthStore
     @State private var isAuthSheetPresented = false
+    @State private var isImporting = false
+    @State private var importMessage: String?
+    @State private var showImportAlert = false
+    @State private var showClearConfirmation = false
+    @State private var isFileImporterPresented = false
 
     var body: some View {
         Group {
@@ -26,6 +33,32 @@ struct ProfileView: View {
                 )
                 .navigationBarTitleDisplayMode(.inline)
             }
+        }
+        .alert("Import Status", isPresented: $showImportAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            if let importMessage {
+                Text(importMessage)
+            }
+        }
+        .confirmationDialog(
+            "Are you sure you want to delete all workout history?",
+            isPresented: $showClearConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Clear All Data", role: .destructive) {
+                clearData()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This action cannot be undone.")
+        }
+        .fileImporter(
+            isPresented: $isFileImporterPresented,
+            allowedContentTypes: [.commaSeparatedText, .plainText],
+            allowsMultipleSelection: false
+        ) { result in
+            handleFilePicker(result: result)
         }
     }
 
@@ -58,6 +91,36 @@ struct ProfileView: View {
             }
 
             Section {
+                Button {
+                    isFileImporterPresented = true
+                } label: {
+                    HStack {
+                        Label("Import Workouts", systemImage: "doc.badge.plus")
+                        Spacer()
+                        if isImporting {
+                            ProgressView()
+                        }
+                    }
+                }
+                .disabled(isImporting)
+            }
+
+            Section {
+                Button(role: .destructive) {
+                    showClearConfirmation = true
+                } label: {
+                    HStack {
+                        Label("Clear All Workout Data", systemImage: "trash")
+                        Spacer()
+                    }
+                }
+            } header: {
+                Text("Danger Zone")
+            } footer: {
+                Text("This will permanently delete all your workout history. Your exercise list will be preserved.")
+            }
+
+            Section {
                 Button(role: .destructive) {
                     withAnimation {
                         authStore.logOut()
@@ -71,6 +134,58 @@ struct ProfileView: View {
                     }
                 }
             }
+        }
+    }
+
+    private func handleFilePicker(result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            isImporting = true
+            
+            // Gain access to the file if it's from outside the app sandbox (e.g. iCloud)
+            guard url.startAccessingSecurityScopedResource() else {
+                importMessage = "Permission denied to access the file."
+                showImportAlert = true
+                isImporting = false
+                return
+            }
+            
+            defer { url.stopAccessingSecurityScopedResource() }
+            
+            Task {
+                do {
+                    let importResult = try await container.csvImporter.importCSV(at: url)
+                    handleImportResult(importResult)
+                } catch {
+                    importMessage = "Import failed: \(error.localizedDescription)"
+                    showImportAlert = true
+                }
+                isImporting = false
+            }
+        case .failure(let error):
+            importMessage = "Selection failed: \(error.localizedDescription)"
+            showImportAlert = true
+        }
+    }
+
+    private func handleImportResult(_ result: CSVImporter.ImportResult) {
+        if result.skippedBecauseAlreadyImported {
+            importMessage = "Already imported previously."
+        } else {
+            importMessage = "Successfully imported:\n\(result.workoutsInserted) Workouts\n\(result.setsInserted) Sets\n\(result.exercisesInsertedOrIgnored) Exercises"
+        }
+        showImportAlert = true
+    }
+
+    private func clearData() {
+        do {
+            try container.workoutStore.deleteAllWorkouts()
+            importMessage = "All workout history cleared."
+            showImportAlert = true
+        } catch {
+            importMessage = "Failed to clear data: \(error.localizedDescription)"
+            showImportAlert = true
         }
     }
 
@@ -118,7 +233,8 @@ struct ProfileView: View {
 }
 
 #Preview {
-    NavigationStack {
-        ProfileView(authStore: AppContainer().authStore)
+    let container = AppContainer()
+    return NavigationStack {
+        ProfileView(container: container, authStore: container.authStore)
     }
 }

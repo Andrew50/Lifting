@@ -59,7 +59,7 @@ jobs:
 
           # Pick an available iPhone simulator (avoid hardcoding a specific model)
           SIM_JSON="$(xcrun simctl list -j devices available)"
-          UDID="$(printf '%s' "${SIM_JSON}" | python3 -c 'import json,sys,re; data=json.load(sys.stdin); devices=(data.get(\"devices\",{}) or {}); devs=[]; [devs.extend(v or []) for v in devices.values()]; iph=[d for d in devs if d.get(\"isAvailable\") and str(d.get(\"name\",\"\")).startswith(\"iPhone\") and d.get(\"udid\")]; pref=[d for d in iph if re.match(r\"^iPhone\\s+\\d\", str(d.get(\"name\",\"\")))]; use=(pref or iph); use.sort(key=lambda d:(\"Pro Max\" in d.get(\"name\",\"\"), re.search(r\"\\bPro\\b\", d.get(\"name\",\"\")) is not None, d.get(\"name\",\"\"))); print(use[-1][\"udid\"] if use else \"\")')"
+          UDID="$(printf '%s' "${SIM_JSON}" | python3 -c 'import json,sys,re; data=json.load(sys.stdin); devices=(data.get("devices",{}) or {}); devs=[]; [devs.extend(v or []) for v in devices.values()]; iph=[d for d in devs if d.get("isAvailable") and str(d.get("name","")).startswith("iPhone") and d.get("udid")]; pref=[d for d in iph if re.match(r"^iPhone\s+\d", str(d.get("name","")))]; use=(pref or iph); use.sort(key=lambda d:("Pro Max" in d.get("name",""), re.search(r"\bPro\b", d.get("name","")) is not None, d.get("name",""))); print(use[-1]["udid"] if use else "")')"
           if [[ -z "${UDID}" ]]; then
             echo "ERROR: Could not find an available iPhone simulator on this runner."
             xcrun simctl list devices available

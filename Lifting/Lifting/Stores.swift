@@ -318,8 +318,13 @@ final class WorkoutStore: ObservableObject {
                         sortOrder: i,
                         weight: nil,
                         reps: nil,
+                        distance: nil,
+                        seconds: nil,
+                        notes: nil,
+                        rpe: nil,
                         rir: nil,
-                        isWarmUp: nil
+                        isWarmUp: nil,
+                        restTimerSeconds: nil
                     )
                     try set.insert(db)
                 }
@@ -332,6 +337,18 @@ final class WorkoutStore: ObservableObject {
     func completeWorkout(workoutId: String) throws {
         let now = Date().timeIntervalSince1970
         try dbQueue.write { db in
+            // Discard empty sets
+            let emptySetsSql = """
+                DELETE FROM workout_sets 
+                WHERE id IN (
+                    SELECT ws.id 
+                    FROM workout_sets ws
+                    JOIN workout_exercises we ON we.id = ws.workout_exercise_id
+                    WHERE we.workout_id = ? AND (ws.weight IS NULL OR ws.reps IS NULL)
+                )
+                """
+            try db.execute(sql: emptySetsSql, arguments: [workoutId])
+
             try db.execute(
                 sql: """
                     UPDATE workouts
@@ -340,6 +357,18 @@ final class WorkoutStore: ObservableObject {
                     """,
                 arguments: [now, now, workoutId]
             )
+        }
+    }
+
+    func countEmptySets(workoutId: String) throws -> Int {
+        try dbQueue.read { db in
+            let sql = """
+                SELECT COUNT(*) 
+                FROM workout_sets ws
+                JOIN workout_exercises we ON we.id = ws.workout_exercise_id
+                WHERE we.workout_id = ? AND (ws.weight IS NULL OR ws.reps IS NULL)
+                """
+            return try Int.fetchOne(db, sql: sql, arguments: [workoutId]) ?? 0
         }
     }
 
@@ -388,7 +417,8 @@ final class WorkoutStore: ObservableObject {
                             weight: s.weight,
                             reps: s.reps,
                             rir: s.rir,
-                            isWarmUp: s.isWarmUp
+                            isWarmUp: s.isWarmUp,
+                            restTimerSeconds: s.restTimerSeconds
                         )
                     }
 
@@ -429,8 +459,13 @@ final class WorkoutStore: ObservableObject {
                 sortOrder: 0,
                 weight: nil,
                 reps: nil,
+                distance: nil,
+                seconds: nil,
+                notes: nil,
+                rpe: nil,
                 rir: nil,
-                isWarmUp: nil
+                isWarmUp: nil,
+                restTimerSeconds: nil
             )
             try set.insert(db)
 
@@ -457,8 +492,13 @@ final class WorkoutStore: ObservableObject {
                 sortOrder: nextOrder,
                 weight: nil,
                 reps: nil,
+                distance: nil,
+                seconds: nil,
+                notes: nil,
+                rpe: nil,
                 rir: nil,
-                isWarmUp: nil
+                isWarmUp: nil,
+                restTimerSeconds: nil
             )
             try set.insert(db)
         }
@@ -496,19 +536,23 @@ final class WorkoutStore: ObservableObject {
         }
     }
 
-    func updateSet(setId: String, weight: Double?, reps: Int?, rir: Double?, isWarmUp: Bool? = nil)
-        throws
-    {
+    func updateSet(
+        setId: String,
+        weight: Double?,
+        reps: Int?,
+        rir: Double?,
+        isWarmUp: Bool? = nil,
+        restTimerSeconds: Int? = nil
+    ) throws {
         try dbQueue.write { db in
-            let warmUpInt: Int? = isWarmUp.map { $0 ? 1 : 0 }
-            try db.execute(
-                sql: """
-                    UPDATE workout_sets
-                    SET weight = ?, reps = ?, rir = ?, is_warm_up = ?
-                    WHERE id = ?
-                    """,
-                arguments: [weight, reps, rir, warmUpInt, setId]
-            )
+            if var set = try WorkoutSetRecord.fetchOne(db, key: setId) {
+                if let weight { set.weight = weight }
+                if let reps { set.reps = reps }
+                if let rir { set.rir = rir }
+                if let isWarmUp { set.isWarmUp = isWarmUp }
+                if let restTimerSeconds { set.restTimerSeconds = restTimerSeconds }
+                try set.update(db)
+            }
         }
     }
 
@@ -525,7 +569,8 @@ final class WorkoutStore: ObservableObject {
                   ws.weight AS weight,
                   ws.reps AS reps,
                   ws.rir AS rir,
-                  ws.is_warm_up AS isWarmUp
+                  ws.is_warm_up AS isWarmUp,
+                  ws.rest_timer_seconds AS restTimerSeconds
                 FROM workout_sets ws
                 JOIN workout_exercises we ON we.id = ws.workout_exercise_id
                 JOIN workouts w ON w.id = we.workout_id
@@ -544,7 +589,8 @@ final class WorkoutStore: ObservableObject {
                     weight: row["weight"],
                     reps: row["reps"],
                     rir: row["rir"],
-                    isWarmUp: isWarmUp
+                    isWarmUp: isWarmUp,
+                    restTimerSeconds: row["restTimerSeconds"]
                 )
             }
         }
@@ -578,11 +624,20 @@ final class WorkoutStore: ObservableObject {
             )
         }
     }
+
+    func deleteAllWorkouts() throws {
+        try dbQueue.write { db in
+            try db.execute(sql: "DELETE FROM workouts")
+        }
+        // Reset the CSV import flag so user can re-import if they want
+        UserDefaults.standard.removeObject(forKey: "CSVImporter.didImportWorkouts")
+    }
 }
 
 @MainActor
 final class ExerciseStore: ObservableObject {
     @Published private(set) var exercises: [ExerciseRecord] = []
+    @Published private(set) var exerciseFrequencies: [String: Int] = [:]
 
     private let dbQueue: DatabaseQueue
 
@@ -592,12 +647,31 @@ final class ExerciseStore: ObservableObject {
 
     func loadAll() async {
         do {
-            let result = try await dbQueue.read { db in
-                try ExerciseRecord.order(ExerciseRecord.Columns.name.asc).fetchAll(db)
+            let (allExercises, frequencies) = try await dbQueue.read { db in
+                let exercises = try ExerciseRecord.order(ExerciseRecord.Columns.name.asc).fetchAll(db)
+                
+                let frequencyRows = try Row.fetchAll(db, sql: """
+                    SELECT we.exercise_id, COUNT(DISTINCT we.workout_id) as frequency
+                    FROM workout_exercises we
+                    JOIN workouts w ON w.id = we.workout_id
+                    WHERE w.status = 1
+                    GROUP BY we.exercise_id
+                    """)
+                
+                var freqMap: [String: Int] = [:]
+                for row in frequencyRows {
+                    let id: String = row["exercise_id"]
+                    let count: Int = row["frequency"]
+                    freqMap[id] = count
+                }
+                
+                return (exercises, freqMap)
             }
-            exercises = result
+            exercises = allExercises
+            exerciseFrequencies = frequencies
         } catch {
             exercises = []
+            exerciseFrequencies = [:]
         }
     }
 }
