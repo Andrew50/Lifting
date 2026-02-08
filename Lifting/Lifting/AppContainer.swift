@@ -16,6 +16,7 @@ final class AppContainer: ObservableObject {
     let workoutStore: WorkoutStore
     let historyStore: HistoryStore
     let exerciseStore: ExerciseStore
+    let authStore: AuthStore
 
     init() {
         do {
@@ -28,6 +29,7 @@ final class AppContainer: ObservableObject {
         workoutStore = WorkoutStore(db: db)
         historyStore = HistoryStore(db: db)
         exerciseStore = ExerciseStore(db: db)
+        authStore = AuthStore(db: db)
     }
 }
 

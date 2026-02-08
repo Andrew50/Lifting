@@ -85,7 +85,8 @@ struct ContentView: View {
             WorkoutView(
                 templateStore: container.templateStore,
                 workoutStore: container.workoutStore,
-                exerciseStore: container.exerciseStore
+                exerciseStore: container.exerciseStore,
+                authStore: container.authStore
             )
             .tabItem {
                 Label("Workout", systemImage: workoutTabIconName)
@@ -113,7 +114,7 @@ struct ContentView: View {
             .tag(AppTab.exercises)
 
             NavigationStack {
-                ProfileView()
+                ProfileView(authStore: container.authStore)
             }
             .tabItem {
                 Label("Profile", systemImage: profileTabIconName)

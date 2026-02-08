@@ -6,11 +6,14 @@
 import SwiftUI
 
 struct CreateAccountView: View {
+    @ObservedObject var authStore: AuthStore
     var dismissSheet: (() -> Void)?
 
     @State private var name: String = ""
     @State private var email: String = ""
     @State private var password: String = ""
+    @State private var errorMessage: String?
+    @State private var isLoading = false
     @FocusState private var focusedField: Field?
 
     private enum Field {
@@ -32,13 +35,23 @@ struct CreateAccountView: View {
                         .foregroundStyle(AuthTheme.subtitleGray)
                         .font(.subheadline)
                     NavigationLink("Log in here.") {
-                        LoginView(dismissSheet: dismissSheet)
+                        LoginView(authStore: authStore, dismissSheet: dismissSheet)
                     }
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundStyle(AuthTheme.primary)
                 }
                 .padding(.bottom, 28)
+
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(.subheadline)
+                        .foregroundStyle(.red)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 12)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("NAME")
@@ -92,13 +105,22 @@ struct CreateAccountView: View {
                 .padding(.horizontal, 24)
                 .padding(.bottom, 20)
 
-                Button("Sign up") {
-                    // Create account
+                Button {
+                    handleSignUp()
+                } label: {
+                    if isLoading {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Text("Sign up")
+                    }
                 }
                 .buttonStyle(PrimaryAuthButtonStyle())
+                .disabled(isLoading)
                 .padding(.horizontal, 24)
                 .padding(.bottom, 32)
             }
+            .animation(.easeInOut(duration: 0.25), value: errorMessage)
         }
         .scrollDismissesKeyboard(.interactively)
         .navigationBarTitleDisplayMode(.inline)
@@ -112,10 +134,24 @@ struct CreateAccountView: View {
             }
         }
     }
+
+    private func handleSignUp() {
+        focusedField = nil
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            try authStore.signUp(name: name, email: email, password: password)
+            dismissSheet?()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isLoading = false
+    }
 }
 
 #Preview {
     NavigationStack {
-        CreateAccountView()
+        CreateAccountView(authStore: AppContainer().authStore)
     }
 }

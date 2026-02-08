@@ -7,10 +7,16 @@
 
 import SwiftUI
 
+private struct WorkoutSheetItem: Identifiable {
+    let workoutId: String
+    var id: String { workoutId }
+}
+
 struct WorkoutView: View {
     @ObservedObject var templateStore: TemplateStore
     @ObservedObject var workoutStore: WorkoutStore
     @ObservedObject var exerciseStore: ExerciseStore
+    @ObservedObject var authStore: AuthStore
 
     enum Route: Hashable {
         case template(String)
@@ -19,6 +25,15 @@ struct WorkoutView: View {
 
     @State private var path: [Route] = []
     @State private var errorMessage: String?
+    @State private var activeWorkoutSheetItem: WorkoutSheetItem?
+
+    private var greetingTitle: String {
+        if let name = authStore.currentUser?.name {
+            let firstName = name.split(separator: " ").first.map(String.init) ?? name
+            return "Hi, \(firstName)!"
+        }
+        return "Hi there!"
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -27,7 +42,9 @@ struct WorkoutView: View {
                     Button {
                         do {
                             let workoutId = try workoutStore.startOrResumePendingWorkout()
-                            path.append(.workout(workoutId))
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                                activeWorkoutSheetItem = WorkoutSheetItem(workoutId: workoutId)
+                            }
                         } catch {
                             errorMessage = "Start Workout failed: \(error)"
                             print(errorMessage ?? "")
@@ -36,7 +53,7 @@ struct WorkoutView: View {
                         Text("Start Workout")
                             .frame(maxWidth: .infinity, alignment: .center)
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(BouncyProminentButtonStyle())
                 }
 
                 Section("Templates") {
@@ -61,7 +78,9 @@ struct WorkoutView: View {
                     }
                 }
             }
-            .navigationTitle("Hi User!")
+            .scrollContentBackground(.hidden)
+            .background(Color.white)
+            .navigationTitle(greetingTitle)
             .navigationDestination(for: Route.self) { route in
                 switch route {
                 case .template(let templateId):
@@ -70,7 +89,8 @@ struct WorkoutView: View {
                         workoutStore: workoutStore,
                         exerciseStore: exerciseStore,
                         subject: .template(id: templateId),
-                        onFinish: { path.removeAll() }
+                        onFinish: { path.removeAll() },
+                        restTimeSeconds: .constant(120)
                     )
 
                 case .workout(let workoutId):
@@ -79,7 +99,8 @@ struct WorkoutView: View {
                         workoutStore: workoutStore,
                         exerciseStore: exerciseStore,
                         subject: .workout(id: workoutId),
-                        onFinish: { path.removeAll() }
+                        onFinish: { path.removeAll() },
+                        restTimeSeconds: .constant(120)
                     )
                 }
             }
@@ -99,6 +120,34 @@ struct WorkoutView: View {
                 Text(errorMessage ?? "")
             }
         }
+        .sheet(item: $activeWorkoutSheetItem) { item in
+            ActiveWorkoutSheetView(
+                templateStore: templateStore,
+                workoutStore: workoutStore,
+                exerciseStore: exerciseStore,
+                workoutId: item.workoutId,
+                onDismiss: {
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        activeWorkoutSheetItem = nil
+                    }
+                }
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
+    }
+}
+
+private struct BouncyProminentButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(Color.accentColor)
+            .foregroundStyle(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .scaleEffect(configuration.isPressed ? 0.97 : 1)
+            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
     }
 }
 
@@ -108,7 +157,8 @@ struct WorkoutView_Previews: PreviewProvider {
         WorkoutView(
             templateStore: container.templateStore,
             workoutStore: container.workoutStore,
-            exerciseStore: container.exerciseStore
+            exerciseStore: container.exerciseStore,
+            authStore: container.authStore
         )
     }
 }

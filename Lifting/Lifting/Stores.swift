@@ -29,7 +29,8 @@ final class TemplateStore: ObservableObject {
                 .map { TemplateSummary(id: $0.id, name: $0.name) }
         }
 
-        cancellable = observation
+        cancellable =
+            observation
             .publisher(in: dbQueue)
             .receive(on: DispatchQueue.main)
             .replaceError(with: [])
@@ -59,10 +60,10 @@ final class TemplateStore: ObservableObject {
         try dbQueue.write { db in
             try db.execute(
                 sql: """
-                UPDATE templates
-                SET name = ?, updated_at = ?
-                WHERE id = ?
-                """,
+                    UPDATE templates
+                    SET name = ?, updated_at = ?
+                    WHERE id = ?
+                    """,
                 arguments: [name, now, templateId]
             )
         }
@@ -86,17 +87,17 @@ final class TemplateStore: ObservableObject {
     func fetchTemplateExercises(templateId: String) throws -> [TemplateExerciseDetail] {
         try dbQueue.read { db in
             let sql = """
-            SELECT
-              te.id AS id,
-              te.exercise_id AS exerciseId,
-              e.name AS exerciseName,
-              te.sort_order AS sortOrder,
-              te.planned_sets_count AS plannedSetsCount
-            FROM template_exercises te
-            JOIN exercises e ON e.id = te.exercise_id
-            WHERE te.template_id = ?
-            ORDER BY te.sort_order ASC
-            """
+                SELECT
+                  te.id AS id,
+                  te.exercise_id AS exerciseId,
+                  e.name AS exerciseName,
+                  te.sort_order AS sortOrder,
+                  te.planned_sets_count AS plannedSetsCount
+                FROM template_exercises te
+                JOIN exercises e ON e.id = te.exercise_id
+                WHERE te.template_id = ?
+                ORDER BY te.sort_order ASC
+                """
 
             return try Row.fetchAll(db, sql: sql, arguments: [templateId]).map { row in
                 TemplateExerciseDetail(
@@ -113,11 +114,13 @@ final class TemplateStore: ObservableObject {
     func addTemplateExercise(templateId: String, exerciseId: String) throws {
         let now = Date().timeIntervalSince1970
         try dbQueue.write { db in
-            let nextOrder: Int = try Int.fetchOne(
-                db,
-                sql: "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM template_exercises WHERE template_id = ?",
-                arguments: [templateId]
-            ) ?? 0
+            let nextOrder: Int =
+                try Int.fetchOne(
+                    db,
+                    sql:
+                        "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM template_exercises WHERE template_id = ?",
+                    arguments: [templateId]
+                ) ?? 0
 
             let row = TemplateExerciseRecord(
                 id: UUID().uuidString,
@@ -205,7 +208,8 @@ final class HistoryStore: ObservableObject {
             }
         }
 
-        cancellable = observation
+        cancellable =
+            observation
             .publisher(in: dbQueue)
             .receive(on: DispatchQueue.main)
             .replaceError(with: [])
@@ -232,6 +236,14 @@ final class WorkoutStore: ObservableObject {
         }
     }
 
+    /// Default workout name based on time of day: "Morning Workout", "Afternoon Workout", or "Evening Workout".
+    static func defaultWorkoutName(for date: Date = Date()) -> String {
+        let hour = Calendar.current.component(.hour, from: date)
+        if hour < 12 { return "Morning Workout" }
+        if hour < 18 { return "Afternoon Workout" }
+        return "Evening Workout"
+    }
+
     /// Creates a new blank pending workout if none exists; otherwise returns the existing pending workout id.
     func startOrResumePendingWorkout() throws -> String {
         if let existing = try fetchPendingWorkoutID() {
@@ -241,7 +253,7 @@ final class WorkoutStore: ObservableObject {
         let now = Date().timeIntervalSince1970
         let workout = WorkoutRecord(
             id: UUID().uuidString,
-            name: "Workout",
+            name: Self.defaultWorkoutName(for: Date()),
             status: .pending,
             sourceTemplateId: nil,
             startedAt: now,
@@ -266,15 +278,9 @@ final class WorkoutStore: ObservableObject {
         return try dbQueue.write { db in
             let now = Date().timeIntervalSince1970
 
-            let templateName: String = try String.fetchOne(
-                db,
-                sql: "SELECT name FROM templates WHERE id = ?",
-                arguments: [templateId]
-            ) ?? "Workout"
-
             let workout = WorkoutRecord(
                 id: UUID().uuidString,
-                name: templateName,
+                name: Self.defaultWorkoutName(for: Date()),
                 status: .pending,
                 sourceTemplateId: templateId,
                 startedAt: now,
@@ -285,7 +291,8 @@ final class WorkoutStore: ObservableObject {
             try workout.insert(db)
 
             // Copy exercises
-            let templateExercises = try TemplateExerciseRecord
+            let templateExercises =
+                try TemplateExerciseRecord
                 .filter(TemplateExerciseRecord.Columns.templateId == templateId)
                 .order(TemplateExerciseRecord.Columns.sortOrder.asc)
                 .fetchAll(db)
@@ -323,10 +330,10 @@ final class WorkoutStore: ObservableObject {
         try dbQueue.write { db in
             try db.execute(
                 sql: """
-                UPDATE workouts
-                SET status = 1, completed_at = ?, updated_at = ?
-                WHERE id = ? AND status = 0
-                """,
+                    UPDATE workouts
+                    SET status = 1, completed_at = ?, updated_at = ?
+                    WHERE id = ? AND status = 0
+                    """,
                 arguments: [now, now, workoutId]
             )
         }
@@ -350,22 +357,23 @@ final class WorkoutStore: ObservableObject {
     func fetchWorkoutExercises(workoutId: String) throws -> [WorkoutExerciseDetail] {
         try dbQueue.read { db in
             let sql = """
-            SELECT
-              we.id AS id,
-              we.exercise_id AS exerciseId,
-              e.name AS exerciseName,
-              we.sort_order AS sortOrder
-            FROM workout_exercises we
-            JOIN exercises e ON e.id = we.exercise_id
-            WHERE we.workout_id = ?
-            ORDER BY we.sort_order ASC
-            """
+                SELECT
+                  we.id AS id,
+                  we.exercise_id AS exerciseId,
+                  e.name AS exerciseName,
+                  we.sort_order AS sortOrder
+                FROM workout_exercises we
+                JOIN exercises e ON e.id = we.exercise_id
+                WHERE we.workout_id = ?
+                ORDER BY we.sort_order ASC
+                """
 
             let exerciseRows = try Row.fetchAll(db, sql: sql, arguments: [workoutId])
 
             return try exerciseRows.map { row in
                 let workoutExerciseId: String = row["id"]
-                let sets = try WorkoutSetRecord
+                let sets =
+                    try WorkoutSetRecord
                     .filter(WorkoutSetRecord.Columns.workoutExerciseId == workoutExerciseId)
                     .order(WorkoutSetRecord.Columns.sortOrder.asc)
                     .fetchAll(db)
@@ -394,11 +402,13 @@ final class WorkoutStore: ObservableObject {
     func addWorkoutExercise(workoutId: String, exerciseId: String) throws {
         let now = Date().timeIntervalSince1970
         try dbQueue.write { db in
-            let nextOrder: Int = try Int.fetchOne(
-                db,
-                sql: "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM workout_exercises WHERE workout_id = ?",
-                arguments: [workoutId]
-            ) ?? 0
+            let nextOrder: Int =
+                try Int.fetchOne(
+                    db,
+                    sql:
+                        "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM workout_exercises WHERE workout_id = ?",
+                    arguments: [workoutId]
+                ) ?? 0
 
             let we = WorkoutExerciseRecord(
                 id: UUID().uuidString,
@@ -429,11 +439,13 @@ final class WorkoutStore: ObservableObject {
 
     func addSet(workoutExerciseId: String) throws {
         try dbQueue.write { db in
-            let nextOrder: Int = try Int.fetchOne(
-                db,
-                sql: "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM workout_sets WHERE workout_exercise_id = ?",
-                arguments: [workoutExerciseId]
-            ) ?? 0
+            let nextOrder: Int =
+                try Int.fetchOne(
+                    db,
+                    sql:
+                        "SELECT COALESCE(MAX(sort_order), -1) + 1 FROM workout_sets WHERE workout_exercise_id = ?",
+                    arguments: [workoutExerciseId]
+                ) ?? 0
 
             let set = WorkoutSetRecord(
                 id: UUID().uuidString,
@@ -480,15 +492,17 @@ final class WorkoutStore: ObservableObject {
         }
     }
 
-    func updateSet(setId: String, weight: Double?, reps: Int?, rir: Double?, isWarmUp: Bool? = nil) throws {
+    func updateSet(setId: String, weight: Double?, reps: Int?, rir: Double?, isWarmUp: Bool? = nil)
+        throws
+    {
         try dbQueue.write { db in
             let warmUpInt: Int? = isWarmUp.map { $0 ? 1 : 0 }
             try db.execute(
                 sql: """
-                UPDATE workout_sets
-                SET weight = ?, reps = ?, rir = ?, is_warm_up = ?
-                WHERE id = ?
-                """,
+                    UPDATE workout_sets
+                    SET weight = ?, reps = ?, rir = ?, is_warm_up = ?
+                    WHERE id = ?
+                    """,
                 arguments: [weight, reps, rir, warmUpInt, setId]
             )
         }
@@ -498,22 +512,22 @@ final class WorkoutStore: ObservableObject {
     func fetchExerciseHistory(exerciseId: String) throws -> [ExerciseHistorySetEntry] {
         try dbQueue.read { db in
             let sql = """
-            SELECT
-              ws.id AS id,
-              w.id AS workoutId,
-              w.name AS workoutName,
-              w.completed_at AS completedAt,
-              ws.sort_order AS sortOrder,
-              ws.weight AS weight,
-              ws.reps AS reps,
-              ws.rir AS rir,
-              ws.is_warm_up AS isWarmUp
-            FROM workout_sets ws
-            JOIN workout_exercises we ON we.id = ws.workout_exercise_id
-            JOIN workouts w ON w.id = we.workout_id
-            WHERE we.exercise_id = ? AND w.status = 1 AND w.completed_at IS NOT NULL
-            ORDER BY w.completed_at DESC, ws.sort_order ASC
-            """
+                SELECT
+                  ws.id AS id,
+                  w.id AS workoutId,
+                  w.name AS workoutName,
+                  w.completed_at AS completedAt,
+                  ws.sort_order AS sortOrder,
+                  ws.weight AS weight,
+                  ws.reps AS reps,
+                  ws.rir AS rir,
+                  ws.is_warm_up AS isWarmUp
+                FROM workout_sets ws
+                JOIN workout_exercises we ON we.id = ws.workout_exercise_id
+                JOIN workouts w ON w.id = we.workout_id
+                WHERE we.exercise_id = ? AND w.status = 1 AND w.completed_at IS NOT NULL
+                ORDER BY w.completed_at DESC, ws.sort_order ASC
+                """
             return try Row.fetchAll(db, sql: sql, arguments: [exerciseId]).map { row in
                 let completedAt: TimeInterval = row["completedAt"] ?? 0
                 let isWarmUp: Bool? = (row["isWarmUp"] as Int?).map { $0 != 0 }
@@ -573,4 +587,3 @@ final class ExerciseStore: ObservableObject {
         }
     }
 }
-

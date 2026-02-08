@@ -8,6 +8,30 @@
 import Foundation
 import GRDB
 
+// MARK: - User
+
+struct UserRecord: Codable, FetchableRecord, PersistableRecord, TableRecord, Identifiable, Hashable {
+    static let databaseTableName = "users"
+
+    var id: String
+    var name: String
+    var email: String
+    var passwordHash: String
+    var createdAt: TimeInterval
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, email
+        case passwordHash = "password_hash"
+        case createdAt = "created_at"
+    }
+
+    enum Columns: String, ColumnExpression {
+        case id, name, email
+        case passwordHash = "password_hash"
+        case createdAt = "created_at"
+    }
+}
+
 // MARK: - Exercise
 
 struct ExerciseRecord: Codable, FetchableRecord, PersistableRecord, TableRecord, Identifiable, Hashable {

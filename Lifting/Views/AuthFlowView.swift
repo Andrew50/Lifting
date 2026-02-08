@@ -9,13 +9,15 @@
 import SwiftUI
 
 struct AuthFlowView: View {
+    @ObservedObject var authStore: AuthStore
+
     var body: some View {
         NavigationStack {
-            CreateAccountView()
+            CreateAccountView(authStore: authStore)
         }
     }
 }
 
 #Preview {
-    AuthFlowView()
+    AuthFlowView(authStore: AppContainer().authStore)
 }

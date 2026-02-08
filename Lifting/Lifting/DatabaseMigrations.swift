@@ -90,6 +90,16 @@ enum DatabaseMigrations {
             }
         }
 
+        migrator.registerMigration("v3_add_users_table") { db in
+            try db.create(table: "users", ifNotExists: true) { t in
+                t.column("id", .text).primaryKey()
+                t.column("name", .text).notNull()
+                t.column("email", .text).notNull().unique()
+                t.column("password_hash", .text).notNull()
+                t.column("created_at", .double).notNull()
+            }
+        }
+
         return migrator
     }()
 }
