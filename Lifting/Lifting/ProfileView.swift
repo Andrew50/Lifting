@@ -25,6 +25,8 @@ struct ProfileView: View {
     private let weightOptions = ["lbs", "kg"]
     private let distanceOptions = ["mi", "km"]
     private let restTimeOptions = [60, 90, 120, 150, 180, 240, 300]
+
+    private func restTimeLabel(_ seconds: Int) -> String {
         let min = seconds / 60
         let sec = seconds % 60
         return sec == 0 ? "\(min) min" : "\(min):\(String(format: "%02d", sec))"
@@ -218,17 +220,15 @@ struct ProfileView: View {
             guard let url = urls.first else { return }
             isImporting = true
             
-            // Gain access to the file if it's from outside the app sandbox (e.g. iCloud)
-            guard url.startAccessingSecurityScopedResource() else {
-                importMessage = "Permission denied to access the file."
-                showImportAlert = true
-                isImporting = false
-                return
-            }
-            
-            defer { url.stopAccessingSecurityScopedResource() }
-            
             Task {
+                // Gain access to the file if it's from outside the app sandbox (e.g. iCloud)
+                let accessed = url.startAccessingSecurityScopedResource()
+                defer {
+                    if accessed {
+                        url.stopAccessingSecurityScopedResource()
+                    }
+                }
+                
                 do {
                     let importResult = try await container.csvImporter.importCSV(at: url)
                     handleImportResult(importResult)

@@ -121,6 +121,10 @@ enum DatabaseMigrations {
             }
         }
 
+        migrator.registerMigration("v7_add_performance_indexes") { db in
+            try db.create(index: "idx_workouts_status_completed_at", on: "workouts", columns: ["status", "completed_at"])
+        }
+
         return migrator
     }()
 }

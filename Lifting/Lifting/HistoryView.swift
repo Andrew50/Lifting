@@ -40,6 +40,14 @@ struct HistoryView: View {
                             }
                             .buttonStyle(.plain)
                         }
+
+                        if historyStore.canLoadMore {
+                            ProgressView()
+                                .padding()
+                                .onAppear {
+                                    historyStore.loadMore()
+                                }
+                        }
                     }
                     .padding()
                 }

@@ -119,25 +119,13 @@ struct WorkoutEditorView: View {
 
     /// Populates previousPerformanceByExerciseId from exercise history (most recent workout per exercise).
     private func loadPreviousPerformanceForWorkoutExercises() {
-        var result: [String: [(weight: Double?, reps: Int?)]] = [:]
-        for exercise in workoutExercises {
-            guard
-                let entries = try? workoutStore.fetchExerciseHistory(
-                    exerciseId: exercise.exerciseId),
-                !entries.isEmpty
-            else {
-                result[exercise.exerciseId] = []
-                continue
-            }
-            // Take sets from the most recent workout (first workoutId in DESC order)
-            let mostRecentWorkoutId = entries[0].workoutId
-            let latestSets =
-                entries
-                .filter { $0.workoutId == mostRecentWorkoutId }
-                .sorted(by: { $0.sortOrder < $1.sortOrder })
-            result[exercise.exerciseId] = latestSets.map { ($0.weight, $0.reps) }
+        let exerciseIds = workoutExercises.map { $0.exerciseId }
+        do {
+            previousPerformanceByExerciseId = try workoutStore.fetchLatestSetsForExercises(
+                exerciseIds: exerciseIds)
+        } catch {
+            previousPerformanceByExerciseId = [:]
         }
-        previousPerformanceByExerciseId = result
     }
 
     private func reloadPreservingTitleEdits() {

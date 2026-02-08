@@ -160,39 +160,62 @@ final class TemplateStore: ObservableObject {
 @MainActor
 final class HistoryStore: ObservableObject {
     @Published private(set) var workouts: [WorkoutSummary] = []
+    @Published private(set) var canLoadMore: Bool = true
 
     private let dbQueue: DatabaseQueue
     private var cancellable: AnyCancellable?
+    private var currentLimit: Int = 20
+    private let pageSize: Int = 20
 
     init(db: AppDatabase) {
         self.dbQueue = db.dbQueue
         startObservingHistory()
     }
 
+    func loadMore() {
+        guard canLoadMore else { return }
+        currentLimit += pageSize
+        startObservingHistory()
+    }
+
     private func startObservingHistory() {
+        let limit = currentLimit
         let observation = ValueObservation.tracking { db in
+            let totalCount = try WorkoutRecord
+                .filter(WorkoutRecord.Columns.status == WorkoutStatus.completed.rawValue)
+                .fetchCount(db)
+
             let records =
                 try WorkoutRecord
                 .filter(WorkoutRecord.Columns.status == WorkoutStatus.completed.rawValue)
                 .order(WorkoutRecord.Columns.completedAt.desc, WorkoutRecord.Columns.startedAt.desc)
+                .limit(limit)
                 .fetchAll(db)
 
-            return try records.compactMap { workout -> WorkoutSummary? in
+            let workoutIds = records.map { $0.id }
+            if workoutIds.isEmpty { return ([WorkoutSummary](), false) }
+
+            // Batch fetch exercise summaries for these workouts
+            let placeholders = workoutIds.map { _ in "?" }.joined(separator: ",")
+            let exercisesSql = """
+                SELECT
+                    we.workout_id,
+                    we.id,
+                    e.name,
+                    (SELECT COUNT(*) FROM workout_sets ws WHERE ws.workout_exercise_id = we.id) as setsCount
+                FROM workout_exercises we
+                JOIN exercises e ON e.id = we.exercise_id
+                WHERE we.workout_id IN (\(placeholders))
+                ORDER BY we.sort_order ASC
+                """
+            let allExercises = try Row.fetchAll(
+                db, sql: exercisesSql, arguments: StatementArguments(workoutIds))
+            let exercisesByWorkoutId = Dictionary(grouping: allExercises, by: { $0["workout_id"] as String })
+
+            let summaries = records.compactMap { workout -> WorkoutSummary? in
                 guard let completedAt = workout.completedAt else { return nil }
 
-                let exercisesSql = """
-                    SELECT
-                        we.id,
-                        e.name,
-                        (SELECT COUNT(*) FROM workout_sets ws WHERE ws.workout_exercise_id = we.id) as setsCount
-                    FROM workout_exercises we
-                    JOIN exercises e ON e.id = we.exercise_id
-                    WHERE we.workout_id = ?
-                    ORDER BY we.sort_order ASC
-                    """
-
-                let exercises = try Row.fetchAll(db, sql: exercisesSql, arguments: [workout.id]).map
-                { row in
+                let exercises = (exercisesByWorkoutId[workout.id] ?? []).map { row in
                     WorkoutExerciseSummary(
                         id: row["id"],
                         name: row["name"],
@@ -208,15 +231,18 @@ final class HistoryStore: ObservableObject {
                     exercises: exercises
                 )
             }
+
+            return (summaries, totalCount > limit)
         }
 
         cancellable =
             observation
             .publisher(in: dbQueue)
             .receive(on: DispatchQueue.main)
-            .replaceError(with: [])
-            .sink { [weak self] summaries in
+            .replaceError(with: ([], false))
+            .sink { [weak self] summaries, hasMore in
                 self?.workouts = summaries
+                self?.canLoadMore = hasMore
             }
     }
 }
@@ -402,32 +428,36 @@ final class WorkoutStore: ObservableObject {
                 """
 
             let exerciseRows = try Row.fetchAll(db, sql: sql, arguments: [workoutId])
+            let workoutExerciseIds = exerciseRows.map { $0["id"] as String }
 
-            return try exerciseRows.map { row in
+            // Batch fetch all sets for these exercises
+            let sets = try WorkoutSetRecord
+                .filter(workoutExerciseIds.contains(WorkoutSetRecord.Columns.workoutExerciseId))
+                .order(WorkoutSetRecord.Columns.sortOrder.asc)
+                .fetchAll(db)
+
+            let setsByExerciseId = Dictionary(grouping: sets, by: { $0.workoutExerciseId })
+
+            return exerciseRows.map { row in
                 let workoutExerciseId: String = row["id"]
-                let sets =
-                    try WorkoutSetRecord
-                    .filter(WorkoutSetRecord.Columns.workoutExerciseId == workoutExerciseId)
-                    .order(WorkoutSetRecord.Columns.sortOrder.asc)
-                    .fetchAll(db)
-                    .map { s in
-                        WorkoutSetDetail(
-                            id: s.id,
-                            sortOrder: s.sortOrder,
-                            weight: s.weight,
-                            reps: s.reps,
-                            rir: s.rir,
-                            isWarmUp: s.isWarmUp,
-                            restTimerSeconds: s.restTimerSeconds
-                        )
-                    }
+                let exerciseSets = (setsByExerciseId[workoutExerciseId] ?? []).map { s in
+                    WorkoutSetDetail(
+                        id: s.id,
+                        sortOrder: s.sortOrder,
+                        weight: s.weight,
+                        reps: s.reps,
+                        rir: s.rir,
+                        isWarmUp: s.isWarmUp,
+                        restTimerSeconds: s.restTimerSeconds
+                    )
+                }
 
                 return WorkoutExerciseDetail(
                     id: workoutExerciseId,
                     exerciseId: row["exerciseId"],
                     exerciseName: row["exerciseName"],
                     sortOrder: row["sortOrder"],
-                    sets: sets
+                    sets: exerciseSets
                 )
             }
         }
@@ -629,6 +659,44 @@ final class WorkoutStore: ObservableObject {
                     restTimerSeconds: row["restTimerSeconds"]
                 )
             }
+        }
+    }
+
+    func fetchLatestSetsForExercises(exerciseIds: [String]) throws -> [String:
+        [(weight: Double?, reps: Int?)]]
+    {
+        guard !exerciseIds.isEmpty else { return [:] }
+
+        return try dbQueue.read { db in
+            let placeholders = exerciseIds.map { _ in "?" }.joined(separator: ",")
+            let sql = """
+                WITH LatestExerciseWorkouts AS (
+                    SELECT 
+                        we.exercise_id, 
+                        we.id as workout_exercise_id, 
+                        w.completed_at,
+                        ROW_NUMBER() OVER (PARTITION BY we.exercise_id ORDER BY w.completed_at DESC) as rn
+                    FROM workout_exercises we
+                    JOIN workouts w ON w.id = we.workout_id
+                    WHERE we.exercise_id IN (\(placeholders)) AND w.status = 1
+                )
+                SELECT lew.exercise_id, ws.weight, ws.reps
+                FROM LatestExerciseWorkouts lew
+                JOIN workout_sets ws ON ws.workout_exercise_id = lew.workout_exercise_id
+                WHERE lew.rn = 1
+                ORDER BY lew.exercise_id, ws.sort_order ASC
+                """
+            let rows = try Row.fetchAll(
+                db, sql: sql, arguments: StatementArguments(exerciseIds))
+
+            var result: [String: [(weight: Double?, reps: Int?)]] = [:]
+            for row in rows {
+                let exerciseId: String = row["exercise_id"]
+                let weight: Double? = row["weight"]
+                let reps: Int? = row["reps"]
+                result[exerciseId, default: []].append((weight, reps))
+            }
+            return result
         }
     }
 
