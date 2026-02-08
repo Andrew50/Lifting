@@ -44,6 +44,8 @@ struct WorkoutEditorView: View {
     @State private var isShowingNoteEditor: Bool = false
     @State private var showRestTimePicker: Bool = false
     @State private var showCancelConfirmation: Bool = false
+    @State private var replacingExerciseId: String?
+    @State private var isShowingReplacePicker: Bool = false
     /// For sheet workout: previous set (weight, reps) per exercise, from most recent completed workout.
     @State private var previousPerformanceByExerciseId: [String: [(weight: Double?, reps: Int?)]] =
         [:]
@@ -529,6 +531,24 @@ struct WorkoutEditorView: View {
                     } label: {
                         Label("Update Rest Timer", systemImage: "clock.arrow.circlepath")
                     }
+                    Divider()
+                    Button {
+                        replacingExerciseId = exercise.id
+                        isShowingReplacePicker = true
+                    } label: {
+                        Label("Replace Exercise", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                    Button(role: .destructive) {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            do {
+                                try workoutStore.deleteWorkoutExercise(
+                                    workoutExerciseId: exercise.id)
+                            } catch {}
+                            reloadPreservingTitleEdits()
+                        }
+                    } label: {
+                        Label("Delete Exercise", systemImage: "trash")
+                    }
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.subheadline)
@@ -640,6 +660,14 @@ struct WorkoutEditorView: View {
                             }
                         } catch {}
                         reloadPreservingTitleEdits()
+                    },
+                    onDelete: {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            do {
+                                try workoutStore.deleteSet(setId: set.id)
+                            } catch {}
+                            reloadPreservingTitleEdits()
+                        }
                     }
                 )
             }
@@ -741,6 +769,33 @@ struct WorkoutEditorView: View {
                 }
             )
             .presentationDetents([.height(260)])
+        }
+        .sheet(isPresented: $isShowingReplacePicker) {
+            NavigationStack {
+                ExercisePickerView(exerciseStore: exerciseStore) { newExercise in
+                    if let replaceId = replacingExerciseId {
+                        do {
+                            try workoutStore.replaceWorkoutExercise(
+                                workoutExerciseId: replaceId,
+                                newExerciseId: newExercise.id
+                            )
+                        } catch {}
+                        reloadPreservingTitleEdits()
+                    }
+                    replacingExerciseId = nil
+                    isShowingReplacePicker = false
+                }
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            replacingExerciseId = nil
+                            isShowingReplacePicker = false
+                        }
+                    }
+                }
+                .navigationTitle("Replace Exercise")
+                .navigationBarTitleDisplayMode(.inline)
+            }
         }
         .navigationDestination(item: $activeWorkoutIdToPush) { workoutId in
             WorkoutEditorView(
@@ -964,9 +1019,13 @@ private struct SheetSetRow: View {
     let onChange: (Double?, Int?, Double?, Bool?) -> Void
     /// Called when the set type (warm-up / failure) changes.
     let onSetTypeChanged: (SetType) -> Void
+    /// Called when the user swipes to delete this set.
+    let onDelete: () -> Void
 
     @State private var weightText: String = ""
     @State private var repsText: String = ""
+    @State private var swipeOffset: CGFloat = 0
+    @State private var showDeleteConfirm: Bool = false
     @State private var setType: SetType = .normal
 
     private func parseDouble(_ text: String) -> Double? {
@@ -1013,61 +1072,103 @@ private struct SheetSetRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            // Tappable set type badge
-            Button {
-                withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
-                    setType = setType.next
+        ZStack(alignment: .trailing) {
+            // Delete background revealed on swipe
+            HStack {
+                Spacer()
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        onDelete()
+                    }
+                } label: {
+                    Image(systemName: "trash.fill")
+                        .font(.body)
+                        .foregroundStyle(.white)
+                        .frame(width: 60, height: .infinity)
                 }
-                onSetTypeChanged(setType)
-            } label: {
-                Text(setLabel)
+                .frame(width: 70)
+            }
+            .background(Color(red: 0.9, green: 0.25, blue: 0.25))
+
+            // Main row content
+            HStack(spacing: 0) {
+                // Tappable set type badge
+                Button {
+                    withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
+                        setType = setType.next
+                    }
+                    onSetTypeChanged(setType)
+                } label: {
+                    Text(setLabel)
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .foregroundStyle(setLabelColor)
+                        .frame(width: 30, height: 30)
+                        .background(setLabelBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .frame(width: 36, alignment: .leading)
+
+                Text(previousText)
                     .font(.subheadline)
-                    .fontWeight(.bold)
-                    .foregroundStyle(setLabelColor)
-                    .frame(width: 30, height: 30)
-                    .background(setLabelBackground)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .frame(maxWidth: .infinity)
+
+                TextField("", text: $weightText)
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.center)
+                    .font(.subheadline)
+                    .frame(width: 56)
+                    .padding(.vertical, 8)
+                    .background(Color(.systemGray6))
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                TextField("", text: $repsText)
+                    .keyboardType(.numberPad)
+                    .multilineTextAlignment(.center)
+                    .font(.subheadline)
+                    .frame(width: 48)
+                    .padding(.vertical, 8)
+                    .background(Color(.systemGray6))
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                Button(action: onToggleComplete) {
+                    Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
+                        .font(.body)
+                        .foregroundStyle(
+                            isCompleted ? Color(red: 0.2, green: 0.4, blue: 1.0) : .secondary)
+                }
+                .buttonStyle(.plain)
+                .frame(width: 28, alignment: .trailing)
             }
-            .buttonStyle(.plain)
-            .frame(width: 36, alignment: .leading)
-
-            Text(previousText)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .frame(maxWidth: .infinity)
-
-            TextField("", text: $weightText)
-                .keyboardType(.decimalPad)
-                .multilineTextAlignment(.center)
-                .font(.subheadline)
-                .frame(width: 56)
-                .padding(.vertical, 8)
-                .background(Color(.systemGray6))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-
-            TextField("", text: $repsText)
-                .keyboardType(.numberPad)
-                .multilineTextAlignment(.center)
-                .font(.subheadline)
-                .frame(width: 48)
-                .padding(.vertical, 8)
-                .background(Color(.systemGray6))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-
-            Button(action: onToggleComplete) {
-                Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
-                    .font(.body)
-                    .foregroundStyle(
-                        isCompleted ? Color(red: 0.2, green: 0.4, blue: 1.0) : .secondary)
-            }
-            .buttonStyle(.plain)
-            .frame(width: 28, alignment: .trailing)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 6)
+            .background(Color.white)
+            .offset(x: swipeOffset)
+            .gesture(
+                DragGesture(minimumDistance: 20)
+                    .onChanged { value in
+                        if value.translation.width < 0 {
+                            swipeOffset = max(value.translation.width, -80)
+                        } else if swipeOffset < 0 {
+                            swipeOffset = min(0, swipeOffset + value.translation.width)
+                        }
+                    }
+                    .onEnded { value in
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            if swipeOffset < -50 {
+                                swipeOffset = -70
+                            } else {
+                                swipeOffset = 0
+                            }
+                        }
+                    }
+            )
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 6)
+        .clipped()
         .onAppear {
             weightText =
                 set.weight.map { $0 == Double(Int($0)) ? String(Int($0)) : String($0) } ?? ""
