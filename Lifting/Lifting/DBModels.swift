@@ -229,8 +229,19 @@ struct WorkoutSetDetail: Identifiable, Hashable {
     var weight: Double?
     var reps: Int?
     var rir: Double?
+    var rpe: Double?
     var isWarmUp: Bool?
     var isCompleted: Bool?
+    var restTimerSeconds: Int?
+}
+
+/// One set from the most recent completed workout for an exercise (used to pre-fill new sets).
+struct LastCompletedSetDetail: Hashable {
+    var sortOrder: Int
+    var weight: Double?
+    var reps: Int?
+    var isWarmUp: Bool?
+    var rir: Double?
     var restTimerSeconds: Int?
 }
 
@@ -239,6 +250,7 @@ struct ExerciseHistorySetEntry: Identifiable, Hashable {
     var id: String
     var workoutId: String
     var workoutName: String
+    var startedAt: Date
     var completedAt: Date
     var sortOrder: Int
     var weight: Double?

@@ -299,10 +299,21 @@ final class WorkoutStore: ObservableObject {
     }
 
     /// Creates a new pending workout copied from a template. If a pending workout already exists, returns it.
+    /// Sets are pre-filled from each exercise's last completed workout when available.
     func startPendingWorkout(fromTemplate templateId: String) throws -> String {
         if let existing = try fetchPendingWorkoutID() {
             return existing
         }
+
+        // Read phase: template exercises and last completed sets per exercise
+        let templateExercises = try dbQueue.read { db in
+            try TemplateExerciseRecord
+                .filter(TemplateExerciseRecord.Columns.templateId == templateId)
+                .order(TemplateExerciseRecord.Columns.sortOrder.asc)
+                .fetchAll(db)
+        }
+        let exerciseIds = templateExercises.map(\.exerciseId)
+        let lastSetsByExercise = try fetchLastCompletedSetsByExercise(exerciseIds: exerciseIds)
 
         return try dbQueue.write { db in
             let now = Date().timeIntervalSince1970
@@ -320,13 +331,6 @@ final class WorkoutStore: ObservableObject {
             )
             try workout.insert(db)
 
-            // Copy exercises
-            let templateExercises =
-                try TemplateExerciseRecord
-                .filter(TemplateExerciseRecord.Columns.templateId == templateId)
-                .order(TemplateExerciseRecord.Columns.sortOrder.asc)
-                .fetchAll(db)
-
             for te in templateExercises {
                 let we = WorkoutExerciseRecord(
                     id: UUID().uuidString,
@@ -337,20 +341,22 @@ final class WorkoutStore: ObservableObject {
                 try we.insert(db)
 
                 let count = max(0, te.plannedSetsCount)
+                let previousSets = lastSetsByExercise[te.exerciseId] ?? []
                 for i in 0..<count {
+                    let prev = previousSets.indices.contains(i) ? previousSets[i] : nil
                     let set = WorkoutSetRecord(
                         id: UUID().uuidString,
                         workoutExerciseId: we.id,
                         sortOrder: i,
-                        weight: nil,
-                        reps: nil,
+                        weight: prev?.weight,
+                        reps: prev?.reps,
                         distance: nil,
                         seconds: nil,
                         notes: nil,
                         rpe: nil,
-                        rir: nil,
-                        isWarmUp: nil,
-                        restTimerSeconds: nil
+                        rir: prev?.rir,
+                        isWarmUp: prev?.isWarmUp,
+                        restTimerSeconds: prev?.restTimerSeconds
                     )
                     try set.insert(db)
                 }
@@ -441,12 +447,14 @@ final class WorkoutStore: ObservableObject {
             return exerciseRows.map { row in
                 let workoutExerciseId: String = row["id"]
                 let exerciseSets = (setsByExerciseId[workoutExerciseId] ?? []).map { s in
-                    WorkoutSetDetail(
+                    let rpe = s.rpe ?? s.rir.map { 10 - $0 }
+                    return WorkoutSetDetail(
                         id: s.id,
                         sortOrder: s.sortOrder,
                         weight: s.weight,
                         reps: s.reps,
                         rir: s.rir,
+                        rpe: rpe,
                         isWarmUp: s.isWarmUp,
                         isCompleted: s.isCompleted,
                         restTimerSeconds: s.restTimerSeconds
@@ -464,7 +472,10 @@ final class WorkoutStore: ObservableObject {
         }
     }
 
+    /// Adds an exercise to a workout. Creates sets pre-filled from the exercise's last completed workout when available.
     func addWorkoutExercise(workoutId: String, exerciseId: String) throws {
+        let previousSets = (try fetchLastCompletedSetsByExercise(exerciseIds: [exerciseId]))[exerciseId] ?? []
+
         let now = Date().timeIntervalSince1970
         try dbQueue.write { db in
             let nextOrder: Int =
@@ -483,22 +494,41 @@ final class WorkoutStore: ObservableObject {
             )
             try we.insert(db)
 
-            // Default 1 empty set for new exercise
-            let set = WorkoutSetRecord(
-                id: UUID().uuidString,
-                workoutExerciseId: we.id,
-                sortOrder: 0,
-                weight: nil,
-                reps: nil,
-                distance: nil,
-                seconds: nil,
-                notes: nil,
-                rpe: nil,
-                rir: nil,
-                isWarmUp: nil,
-                restTimerSeconds: nil
-            )
-            try set.insert(db)
+            if previousSets.isEmpty {
+                let set = WorkoutSetRecord(
+                    id: UUID().uuidString,
+                    workoutExerciseId: we.id,
+                    sortOrder: 0,
+                    weight: nil,
+                    reps: nil,
+                    distance: nil,
+                    seconds: nil,
+                    notes: nil,
+                    rpe: nil,
+                    rir: nil,
+                    isWarmUp: nil,
+                    restTimerSeconds: nil
+                )
+                try set.insert(db)
+            } else {
+                for (i, prev) in previousSets.enumerated() {
+                    let set = WorkoutSetRecord(
+                        id: UUID().uuidString,
+                        workoutExerciseId: we.id,
+                        sortOrder: i,
+                        weight: prev.weight,
+                        reps: prev.reps,
+                        distance: nil,
+                        seconds: nil,
+                        notes: nil,
+                        rpe: nil,
+                        rir: prev.rir,
+                        isWarmUp: prev.isWarmUp,
+                        restTimerSeconds: prev.restTimerSeconds
+                    )
+                    try set.insert(db)
+                }
+            }
 
             try db.execute(
                 sql: "UPDATE workouts SET updated_at = ? WHERE id = ?",
@@ -607,7 +637,8 @@ final class WorkoutStore: ObservableObject {
         setId: String,
         weight: Double?,
         reps: Int?,
-        rir: Double?,
+        rir: Double? = nil,
+        rpe: Double? = nil,
         isWarmUp: Bool? = nil,
         isCompleted: Bool? = nil,
         restTimerSeconds: Int? = nil
@@ -617,6 +648,10 @@ final class WorkoutStore: ObservableObject {
                 if let weight { set.weight = weight }
                 if let reps { set.reps = reps }
                 if let rir { set.rir = rir }
+                if let rpe {
+                    set.rpe = rpe
+                    set.rir = 10 - rpe
+                }
                 if let isWarmUp { set.isWarmUp = isWarmUp }
                 if let isCompleted { set.isCompleted = isCompleted }
                 if let restTimerSeconds { set.restTimerSeconds = restTimerSeconds }
@@ -634,6 +669,15 @@ final class WorkoutStore: ObservableObject {
         }
     }
 
+    func clearSetRestTimer(setId: String) throws {
+        try dbQueue.write { db in
+            if var set = try WorkoutSetRecord.fetchOne(db, key: setId) {
+                set.restTimerSeconds = nil
+                try set.update(db)
+            }
+        }
+    }
+
     /// All performed sets for an exercise across completed workouts, newest first.
     func fetchExerciseHistory(exerciseId: String) throws -> [ExerciseHistorySetEntry] {
         try dbQueue.read { db in
@@ -642,6 +686,7 @@ final class WorkoutStore: ObservableObject {
                   ws.id AS id,
                   w.id AS workoutId,
                   w.name AS workoutName,
+                  w.started_at AS startedAt,
                   w.completed_at AS completedAt,
                   ws.sort_order AS sortOrder,
                   ws.weight AS weight,
@@ -656,12 +701,14 @@ final class WorkoutStore: ObservableObject {
                 ORDER BY w.completed_at DESC, ws.sort_order ASC
                 """
             return try Row.fetchAll(db, sql: sql, arguments: [exerciseId]).map { row in
+                let startedAt: TimeInterval = row["startedAt"] ?? 0
                 let completedAt: TimeInterval = row["completedAt"] ?? 0
                 let isWarmUp: Bool? = (row["isWarmUp"] as Int?).map { $0 != 0 }
                 return ExerciseHistorySetEntry(
                     id: row["id"],
                     workoutId: row["workoutId"],
                     workoutName: row["workoutName"],
+                    startedAt: Date(timeIntervalSince1970: startedAt),
                     completedAt: Date(timeIntervalSince1970: completedAt),
                     sortOrder: row["sortOrder"],
                     weight: row["weight"],
@@ -707,6 +754,50 @@ final class WorkoutStore: ObservableObject {
                 let weight: Double? = row["weight"]
                 let reps: Int? = row["reps"]
                 result[exerciseId, default: []].append((weight, reps))
+            }
+            return result
+        }
+    }
+
+    /// Last completed sets per exercise (from most recent completed workout), for pre-filling new sets.
+    func fetchLastCompletedSetsByExercise(exerciseIds: [String]) throws -> [String: [LastCompletedSetDetail]] {
+        guard !exerciseIds.isEmpty else { return [:] }
+
+        return try dbQueue.read { db in
+            let placeholders = exerciseIds.map { _ in "?" }.joined(separator: ",")
+            let sql = """
+                WITH LatestExerciseWorkouts AS (
+                    SELECT 
+                        we.exercise_id, 
+                        we.id as workout_exercise_id, 
+                        w.completed_at,
+                        ROW_NUMBER() OVER (PARTITION BY we.exercise_id ORDER BY w.completed_at DESC) as rn
+                    FROM workout_exercises we
+                    JOIN workouts w ON w.id = we.workout_id
+                    WHERE we.exercise_id IN (\(placeholders)) AND w.status = 1
+                )
+                SELECT lew.exercise_id, ws.sort_order, ws.weight, ws.reps, ws.is_warm_up, ws.rir, ws.rest_timer_seconds
+                FROM LatestExerciseWorkouts lew
+                JOIN workout_sets ws ON ws.workout_exercise_id = lew.workout_exercise_id
+                WHERE lew.rn = 1
+                ORDER BY lew.exercise_id, ws.sort_order ASC
+                """
+            let rows = try Row.fetchAll(
+                db, sql: sql, arguments: StatementArguments(exerciseIds))
+
+            var result: [String: [LastCompletedSetDetail]] = [:]
+            for row in rows {
+                let exerciseId: String = row["exercise_id"]
+                let isWarmUp: Bool? = (row["is_warm_up"] as Int?).map { $0 != 0 }
+                let detail = LastCompletedSetDetail(
+                    sortOrder: row["sort_order"] ?? 0,
+                    weight: row["weight"],
+                    reps: row["reps"],
+                    isWarmUp: isWarmUp,
+                    rir: row["rir"],
+                    restTimerSeconds: row["rest_timer_seconds"]
+                )
+                result[exerciseId, default: []].append(detail)
             }
             return result
         }

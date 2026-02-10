@@ -86,7 +86,7 @@ struct WorkoutHistoryBubble: View {
         HistoryBubble {
             HistoryBubbleHeader(
                 title: workout.name,
-                subtitle: "\(workout.completedAt.formatted(.dateTime.month(.defaultDigits).day(.defaultDigits).year(.twoDigits))). \(formatDuration(workout.duration))"
+                subtitle: "\(workout.completedAt.formatted(.dateTime.month(.defaultDigits).day(.defaultDigits).year(.twoDigits))) \(formatDuration(workout.duration))"
             )
 
             HistoryDivider()

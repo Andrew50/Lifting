@@ -52,11 +52,28 @@ struct HistoryDivider: View {
 
 struct HistorySetRow: View {
     let setNumber: Int
+    /// Weight in lbs (stored canonical).
     let weight: Double?
     let reps: Int?
     let rir: Double?
     let isWarmUp: Bool?
     let restTimerSeconds: Int?
+    let displayWeightUnit: String
+    let displayIntensityDisplay: String
+
+    private var displayWeight: Double? {
+        guard let lbs = weight else { return nil }
+        return displayWeightUnit == "kg" ? lbs / 2.20462 : lbs
+    }
+
+    private var displayIntensityValue: Double? {
+        guard let r = rir else { return nil }
+        return displayIntensityDisplay == "rpe" ? (10 - r) : r
+    }
+
+    private var intensityLabel: String {
+        displayIntensityDisplay == "rpe" ? "RPE" : "RIR"
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -67,8 +84,9 @@ struct HistorySetRow: View {
                     .frame(width: 44, alignment: .leading)
 
                 HStack(spacing: 4) {
-                    if let w = weight {
-                        Text(String(format: "%.1f lbs", w))
+                    if let w = displayWeight {
+                        let unitSuffix = displayWeightUnit == "kg" ? " kg" : " lbs"
+                        Text(String(format: "%.1f", w) + unitSuffix)
                             .font(.body.monospacedDigit())
                     } else {
                         Text("—")
@@ -85,7 +103,7 @@ struct HistorySetRow: View {
                 Spacer()
 
                 HStack(spacing: 8) {
-                    if let rir = rir {
+                    if rir != nil {
                         if rir == 0 {
                             Text("Failure")
                                 .font(.caption)
@@ -94,8 +112,9 @@ struct HistorySetRow: View {
                                 .background(.red.opacity(0.1))
                                 .foregroundStyle(.red)
                                 .clipShape(Capsule())
-                        } else {
-                            Text("RIR \(rir == Double(Int(rir)) ? String(Int(rir)) : String(format: "%.1f", rir))")
+                        } else if let val = displayIntensityValue {
+                            let str = val == Double(Int(val)) ? String(Int(val)) : String(format: "%.1f", val)
+                            Text("\(intensityLabel) \(str)")
                                 .font(.caption)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)

@@ -12,13 +12,19 @@ struct ActiveWorkoutSheetView: View {
     @ObservedObject var exerciseStore: ExerciseStore
 
     let workoutId: String
+    @Binding var selectedDetent: PresentationDetent
     let onDismiss: () -> Void
+    /// Called when user drags to collapsed detent; parent dismisses sheet and shows in-app bar.
+    var onCollapseToBar: (() -> Void)?
+
+    private static let collapsedDetent = PresentationDetent.height(72)
 
     @State private var restTimeSeconds: Int = 120
     @State private var showRestTimePicker = false
     @State private var isFinishing = false
     @State private var workoutStartedAt: TimeInterval?
     @State private var showFinishConfirmation = false
+    @State private var showCancelConfirmation = false
     @State private var emptySetsCount = 0
 
     // Rest countdown timer
@@ -66,6 +72,21 @@ struct ActiveWorkoutSheetView: View {
     }
 
     var body: some View {
+        fullContent
+            .background(Color(UIColor.systemBackground))
+            .onAppear {
+                if let workout = try? workoutStore.fetchWorkout(workoutId: workoutId) {
+                    workoutStartedAt = workout.startedAt
+                }
+            }
+            .onChange(of: selectedDetent) { _, newDetent in
+                if newDetent == Self.collapsedDetent {
+                    onCollapseToBar?()
+                }
+            }
+    }
+
+    private var fullContent: some View {
         VStack(spacing: 0) {
             // Header: clock (left), elapsed timer or countdown (center), Finish (right)
             ZStack {
@@ -95,19 +116,18 @@ struct ActiveWorkoutSheetView: View {
                 }
 
                 HStack {
-                    // Left: clock button
+                    // Left: Cancel button
                     Button {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                            showRestTimePicker.toggle()
-                        }
+                        showCancelConfirmation = true
                     } label: {
-                        Image(systemName: "clock.arrow.circlepath")
-                            .font(.title3)
-                            .foregroundStyle(.primary)
-                            .frame(width: 44, height: 44)
-                            .background(Color(.systemGray6))
+                        Text("Cancel")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .background(Color.red)
                             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                            .contentShape(Rectangle())
                     }
                     .buttonStyle(ScaleButtonStyle())
 
@@ -150,6 +170,19 @@ struct ActiveWorkoutSheetView: View {
                     Text("Are you sure you want to finish this workout?")
                 }
             }
+            .alert(
+                "Cancel Workout?",
+                isPresented: $showCancelConfirmation
+            ) {
+                Button("Cancel Workout", role: .destructive) {
+                    cancelWorkout()
+                }
+                Button("Keep Working", role: .cancel) {}
+            } message: {
+                Text(
+                    "Are you sure you want to cancel this workout? All progress will be lost."
+                )
+            }
 
             if showRestTimePicker {
                 restTimePickerSection
@@ -172,12 +205,6 @@ struct ActiveWorkoutSheetView: View {
                         startRestCountdown()
                     }
                 )
-            }
-        }
-        .background(Color(UIColor.systemBackground))
-        .onAppear {
-            if let workout = try? workoutStore.fetchWorkout(workoutId: workoutId) {
-                workoutStartedAt = workout.startedAt
             }
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.8), value: showRestTimePicker)
@@ -230,6 +257,13 @@ struct ActiveWorkoutSheetView: View {
             onDismiss()
         }
     }
+
+    private func cancelWorkout() {
+        do {
+            try workoutStore.discardPendingWorkout(workoutId: workoutId)
+        } catch {}
+        onDismiss()
+    }
 }
 
 private struct ScaleButtonStyle: ButtonStyle {
@@ -246,6 +280,8 @@ private struct ScaleButtonStyle: ButtonStyle {
         workoutStore: AppContainer().workoutStore,
         exerciseStore: AppContainer().exerciseStore,
         workoutId: "preview",
-        onDismiss: {}
+        selectedDetent: .constant(.large),
+        onDismiss: {},
+        onCollapseToBar: nil
     )
 }

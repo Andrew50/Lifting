@@ -13,28 +13,28 @@ struct ExerciseHistoryView: View {
     @State private var entries: [ExerciseHistorySetEntry] = []
     @State private var loadError: Bool = false
 
-    private var groupedByWorkout: [(workoutId: String, name: String, date: Date, sets: [ExerciseHistorySetEntry])] {
+    private var groupedByWorkout: [(workoutId: String, name: String, startedAt: Date, sets: [ExerciseHistorySetEntry])] {
         var result: [(String, String, Date, [ExerciseHistorySetEntry])] = []
         var currentWorkoutId: String?
         var currentName: String?
-        var currentDate: Date?
+        var currentStartedAt: Date?
         var currentSets: [ExerciseHistorySetEntry] = []
 
         for entry in entries {
             if entry.workoutId != currentWorkoutId {
-                if let id = currentWorkoutId, let name = currentName, let date = currentDate, !currentSets.isEmpty {
-                    result.append((id, name, date, currentSets))
+                if let id = currentWorkoutId, let name = currentName, let startedAt = currentStartedAt, !currentSets.isEmpty {
+                    result.append((id, name, startedAt, currentSets))
                 }
                 currentWorkoutId = entry.workoutId
                 currentName = entry.workoutName
-                currentDate = entry.completedAt
+                currentStartedAt = entry.startedAt
                 currentSets = [entry]
             } else {
                 currentSets.append(entry)
             }
         }
-        if let id = currentWorkoutId, let name = currentName, let date = currentDate, !currentSets.isEmpty {
-            result.append((id, name, date, currentSets))
+        if let id = currentWorkoutId, let name = currentName, let startedAt = currentStartedAt, !currentSets.isEmpty {
+            result.append((id, name, startedAt, currentSets))
         }
         return result
     }
@@ -62,7 +62,7 @@ struct ExerciseHistoryView: View {
                             HistoryBubble {
                                 HistoryBubbleHeader(
                                     title: group.name,
-                                    subtitle: formatDate(group.date)
+                                    subtitle: "Started \(formatDate(group.startedAt))"
                                 )
 
                                 HistoryDivider()
@@ -75,7 +75,9 @@ struct ExerciseHistoryView: View {
                                             reps: set.reps,
                                             rir: set.rir,
                                             isWarmUp: set.isWarmUp,
-                                            restTimerSeconds: set.restTimerSeconds
+                                            restTimerSeconds: set.restTimerSeconds,
+                                            displayWeightUnit: DisplayPreferences.displayWeightUnit(for: exerciseId),
+                                            displayIntensityDisplay: DisplayPreferences.displayIntensityDisplay(for: exerciseId)
                                         )
                                     }
                                 }

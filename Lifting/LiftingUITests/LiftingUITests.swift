@@ -34,7 +34,10 @@ final class LiftingUITests: XCTestCase {
     @MainActor
     func testLaunchPerformance() throws {
         // This measures how long it takes to launch your application.
-        measure(metrics: [XCTApplicationLaunchMetric()]) {
+        // Use a small iteration count so CI doesn't run many full app launches.
+        let options = XCTMeasureOptions()
+        options.iterationCount = 3
+        measure(options: options, metrics: [XCTApplicationLaunchMetric()]) {
             XCUIApplication().launch()
         }
     }

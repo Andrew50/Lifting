@@ -6,6 +6,44 @@
 //
 
 import SwiftUI
+import UIKit
+
+// MARK: - Hosts row content and adds UISwipeGestureRecognizer (does not block ScrollView vertical scrolling)
+private struct SetRowWithSwipe<Content: View>: UIViewRepresentable {
+    let content: Content
+    let onSwipeLeft: () -> Void
+
+    func makeUIView(context: Context) -> UIView {
+        let host = UIHostingController(rootView: content)
+        host.view.backgroundColor = .clear
+        let swipe = UISwipeGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.didSwipeLeft(_:)))
+        swipe.direction = .left
+        host.view.addGestureRecognizer(swipe)
+        context.coordinator.host = host
+        return host.view!
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        context.coordinator.host?.rootView = content
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onSwipeLeft: onSwipeLeft)
+    }
+
+    class Coordinator: NSObject {
+        var onSwipeLeft: () -> Void
+        weak var host: UIHostingController<Content>?
+
+        init(onSwipeLeft: @escaping () -> Void) {
+            self.onSwipeLeft = onSwipeLeft
+        }
+
+        @objc func didSwipeLeft(_: UISwipeGestureRecognizer) {
+            onSwipeLeft()
+        }
+    }
+}
 
 struct WorkoutEditorView: View {
     enum Subject: Hashable {
@@ -42,12 +80,15 @@ struct WorkoutEditorView: View {
     @State private var isShowingExercisePicker: Bool = false
     @State private var restTimeEditText: String = ""
     @State private var isEditingRestTime: Bool = false
+    /// Set id whose rest bar is currently being edited (nil = none).
+    @State private var editingRestSetId: String?
     @State private var workoutNotes: String = ""
     @State private var isShowingNoteEditor: Bool = false
     @State private var showRestTimePicker: Bool = false
-    @State private var showCancelConfirmation: Bool = false
     @State private var replacingExerciseId: String?
     @State private var isShowingReplacePicker: Bool = false
+    /// Incremented when display unit/intensity is saved so the sheet (e.g. previous column) re-renders.
+    @State private var displayPrefsVersion: Int = 0
     /// For sheet workout: previous set (weight, reps) per exercise, from most recent completed workout.
     @State private var previousPerformanceByExerciseId: [String: [(weight: Double?, reps: Int?)]] =
         [:]
@@ -137,6 +178,20 @@ struct WorkoutEditorView: View {
         hasLoadedInitialTitle = true
     }
 
+    /// Set weight unit for all exercises in the current workout (per-exercise storage) and app-wide default.
+    private func saveWeightUnitForCurrentWorkout(unit: String) {
+        let exerciseIds = workoutExercises.map(\.exerciseId)
+        DisplayPreferences.setWeightUnit(unit, forExerciseIds: exerciseIds)
+        displayPrefsVersion += 1
+    }
+
+    /// Set intensity display for all exercises in the current workout (per-exercise storage) and app-wide default.
+    private func saveIntensityDisplayForCurrentWorkout(display: String) {
+        let exerciseIds = workoutExercises.map(\.exerciseId)
+        DisplayPreferences.setIntensityDisplay(display, forExerciseIds: exerciseIds)
+        displayPrefsVersion += 1
+    }
+
     // MARK: - Header actions
 
     private func saveAndClose() {
@@ -206,10 +261,12 @@ struct WorkoutEditorView: View {
 
     // MARK: - Body
 
-    private var workoutDateFormatted: String? {
+    /// Date and time the workout was started (e.g. "Feb 10, 2025 at 2:30 PM").
+    private var workoutStartedAtFormatted: String? {
         guard let startedAt = workoutStartedAt else { return nil }
         let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d, yyyy"
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
         return formatter.string(from: Date(timeIntervalSince1970: startedAt))
     }
 
@@ -249,26 +306,69 @@ struct WorkoutEditorView: View {
     }
 
     private func commitRestTimeEdit() {
-        if let seconds = parseRestTime(restTimeEditText), seconds > 0 {
-            restTimeSeconds = seconds
+        if let setId = editingRestSetId {
+            if let seconds = parseRestTime(restTimeEditText), seconds > 0 {
+                try? workoutStore.updateSet(setId: setId, weight: nil, reps: nil, restTimerSeconds: seconds)
+            }
+            editingRestSetId = nil
+            reloadPreservingTitleEdits()
+        } else {
+            if let seconds = parseRestTime(restTimeEditText), seconds > 0 {
+                restTimeSeconds = seconds
+            }
+            restTimeEditText = restTimeFormatted
         }
-        restTimeEditText = restTimeFormatted
         isEditingRestTime = false
     }
 
-    /// Formats previous set for display: "50 × 10", "50 lbs", "10 reps", or "—".
-    private func formatPreviousSet(_ previous: (weight: Double?, reps: Int?)?) -> String {
+    private func formatRestSeconds(_ seconds: Int?) -> String {
+        guard let s = seconds, s > 0 else { return "0:00" }
+        let min = s / 60
+        let sec = s % 60
+        return String(format: "%d:%02d", min, sec)
+    }
+
+    @ViewBuilder
+    private func restTimerBar(setAbove: WorkoutSetDetail) -> some View {
+        RestTimerBarView(
+            setAbove: setAbove,
+            restTimeEditText: $restTimeEditText,
+            editingRestSetId: $editingRestSetId,
+            formatRestSeconds: formatRestSeconds,
+            onTap: {
+                editingRestSetId = setAbove.id
+                restTimeEditText = formatRestSeconds(setAbove.restTimerSeconds)
+                isEditingRestTime = true
+            },
+            onCommit: commitRestTimeEdit
+        )
+    }
+
+    /// Rounds to nearest tenth for display.
+    private func roundedToTenth(_ value: Double) -> Double {
+        (value * 10).rounded() / 10
+    }
+
+    /// Formats previous set for display; weight is in lbs, converted to displayUnit, rounded to nearest tenth. "50 × 10", "50 lbs", "10 reps", or "—".
+    private func formatPreviousSet(_ previous: (weight: Double?, reps: Int?)?, displayWeightUnit: String) -> String {
         guard let prev = previous else { return "—" }
         let hasWeight = prev.weight != nil && prev.weight! > 0
         let hasReps = prev.reps != nil && prev.reps! > 0
+        let unitSuffix = displayWeightUnit == "kg" ? " kg" : " lbs"
         if hasWeight && hasReps {
-            let w = prev.weight!
+            let lbs = prev.weight!
+            let raw = displayWeightUnit == "kg" ? lbs / 2.20462 : lbs
+            let displayW = roundedToTenth(raw)
             let r = prev.reps!
-            return w == Double(Int(w)) ? "\(Int(w)) × \(r)" : "\(w) × \(r)"
+            let wStr = displayW == Double(Int(displayW)) ? String(Int(displayW)) : String(format: "%.1f", displayW)
+            return "\(wStr) × \(r)"
         }
         if hasWeight {
-            return prev.weight! == Double(Int(prev.weight!))
-                ? "\(Int(prev.weight!)) lbs" : "\(prev.weight!) lbs"
+            let lbs = prev.weight!
+            let raw = displayWeightUnit == "kg" ? lbs / 2.20462 : lbs
+            let displayW = roundedToTenth(raw)
+            let wStr = displayW == Double(Int(displayW)) ? String(Int(displayW)) : String(format: "%.1f", displayW)
+            return wStr + unitSuffix
         }
         if hasReps { return "\(prev.reps!) reps" }
         return "—"
@@ -281,8 +381,8 @@ struct WorkoutEditorView: View {
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled()
 
-                if case .workout = subject, let dateStr = workoutDateFormatted {
-                    Text(dateStr)
+                if case .workout = subject, let dateTimeStr = workoutStartedAtFormatted {
+                    Text(dateTimeStr)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -315,60 +415,41 @@ struct WorkoutEditorView: View {
     private func sheetWorkoutContent(workoutId: String) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
-                // Workout overview: title + menu, date & duration inline
+                // Workout overview: title, date & duration inline
+                // TODO: Notes will eventually need to be re-added here (e.g. menu or note entry).
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(alignment: .center) {
                         TextField("", text: $title)
-                            .font(.title3)
-                            .fontWeight(.bold)
+                            .font(.system(size: 25, weight: .bold))
                             .foregroundStyle(.primary)
                         Spacer()
-                        Menu {
-                            Button {
-                                isShowingNoteEditor = true
-                            } label: {
-                                Label("Note", systemImage: "note.text")
-                            }
-                            Button {
-                                showRestTimePicker = true
-                            } label: {
-                                Label("Update Rest Timer", systemImage: "clock.arrow.circlepath")
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis")
-                                .font(.caption)
-                                .foregroundStyle(.white)
-                                .frame(width: 28, height: 28)
-                                .background(Color(red: 0.4, green: 0.6, blue: 1.0))
-                                .clipShape(Circle())
-                        }
                     }
 
                     HStack(spacing: 12) {
                         HStack(spacing: 4) {
                             Image(systemName: "calendar")
-                                .font(.caption2)
+                                .font(.system(size: 12))
                                 .foregroundStyle(.secondary)
-                            if let dateStr = workoutDateFormatted {
-                                Text(dateStr)
-                                    .font(.caption)
+                            if let dateTimeStr = workoutStartedAtFormatted {
+                                Text(dateTimeStr)
+                                    .font(.system(size: 15))
                                     .foregroundStyle(.secondary)
                             }
                         }
 
                         HStack(spacing: 4) {
                             Image(systemName: "clock")
-                                .font(.caption2)
+                                .font(.system(size: 12))
                                 .foregroundStyle(.secondary)
                             if isPendingWorkout {
                                 TimelineView(.periodic(from: .now, by: 1.0)) { _ in
                                     Text(workoutDurationFormatted ?? "0:00")
-                                        .font(.caption)
+                                        .font(.system(size: 15))
                                         .foregroundStyle(.secondary)
                                 }
                             } else {
                                 Text(workoutDurationFormatted ?? "0:00")
-                                    .font(.caption)
+                                    .font(.system(size: 15))
                                     .foregroundStyle(.secondary)
                             }
                         }
@@ -381,11 +462,11 @@ struct WorkoutEditorView: View {
                 if !workoutNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     HStack(alignment: .top, spacing: 6) {
                         Image(systemName: "note.text")
-                            .font(.caption2)
+                            .font(.system(size: 12))
                             .foregroundStyle(Color(red: 0.4, green: 0.6, blue: 1.0))
                             .padding(.top, 1)
                         Text(workoutNotes)
-                            .font(.caption)
+                            .font(.system(size: 15))
                             .foregroundStyle(.secondary)
                             .lineLimit(2)
                     }
@@ -400,9 +481,10 @@ struct WorkoutEditorView: View {
                     }
                 }
 
-                // Exercises with table layout
+                // Exercises with table layout (id includes displayPrefsVersion so previous column and headers update when unit/RIR-RPE toggled)
                 ForEach(workoutExercises) { exercise in
                     sheetExerciseBlock(exercise: exercise, workoutId: workoutId)
+                        .id("\(exercise.id)-\(displayPrefsVersion)")
                 }
 
                 // Add Exercises button (compact)
@@ -411,10 +493,9 @@ struct WorkoutEditorView: View {
                 } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "plus")
-                            .font(.caption2)
+                            .font(.system(size: 12))
                         Text("Add Exercises")
-                            .font(.caption)
-                            .fontWeight(.medium)
+                            .font(.system(size: 15, weight: .medium))
                     }
                     .foregroundStyle(Color.accentColor)
                     .frame(maxWidth: .infinity)
@@ -427,42 +508,13 @@ struct WorkoutEditorView: View {
                 .padding(.top, 4)
 
                 if isPendingWorkout {
-                    Button {
-                        showCancelConfirmation = true
-                    } label: {
-                        Text("Cancel Workout")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundStyle(.red)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 10)
-                            .background(Color.red.opacity(0.1))
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .padding(.horizontal, 16)
-                    .alert(
-                        "Cancel Workout?",
-                        isPresented: $showCancelConfirmation
-                    ) {
-                        Button("Cancel Workout", role: .destructive) {
-                            if case .workout(let workoutId) = subject {
-                                discardAndClose(workoutId: workoutId)
-                            }
-                        }
-                        Button("Keep Working", role: .cancel) {}
-                    } message: {
-                        Text(
-                            "Are you sure you want to cancel this workout? All progress will be lost."
-                        )
-                    }
+                    // Cancel is in the active workout header (ActiveWorkoutSheetView), not here.
                 } else {
                     Button {
                         saveAndClose()
                     } label: {
                         Text("Save Changes")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
+                            .font(.system(size: 19, weight: .medium))
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
@@ -476,8 +528,7 @@ struct WorkoutEditorView: View {
                         deleteAndClose()
                     } label: {
                         Text("Delete Workout")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
+                            .font(.system(size: 19, weight: .medium))
                             .foregroundStyle(.red)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 10)
@@ -501,7 +552,9 @@ struct WorkoutEditorView: View {
 
     private func sheetExerciseBlock(exercise: WorkoutExerciseDetail, workoutId: String) -> some View
     {
-        VStack(alignment: .leading, spacing: 2) {
+        let exerciseWeightUnit = DisplayPreferences.displayWeightUnit(for: exercise.exerciseId)
+        let exerciseIntensityDisplay = DisplayPreferences.displayIntensityDisplay(for: exercise.exerciseId)
+        return VStack(alignment: .leading, spacing: 2) {
             // Exercise name (blue) + icons
             HStack(spacing: 6) {
                 Button {
@@ -509,8 +562,7 @@ struct WorkoutEditorView: View {
                         id: exercise.exerciseId, name: exercise.exerciseName)
                 } label: {
                     Text(exercise.exerciseName)
-                        .font(.caption)
-                        .fontWeight(.semibold)
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(Color(red: 0.2, green: 0.4, blue: 1.0))
                 }
                 .buttonStyle(.plain)
@@ -526,6 +578,28 @@ struct WorkoutEditorView: View {
                         showRestTimePicker = true
                     } label: {
                         Label("Update Rest Timer", systemImage: "clock.arrow.circlepath")
+                    }
+                    Divider()
+                    Button {
+                        saveWeightUnitForCurrentWorkout(unit: "lbs")
+                    } label: {
+                        Label(exerciseWeightUnit == "lbs" ? "Use lbs (current)" : "Use lbs", systemImage: "scalemass")
+                    }
+                    Button {
+                        saveWeightUnitForCurrentWorkout(unit: "kg")
+                    } label: {
+                        Label(exerciseWeightUnit == "kg" ? "Use kg (current)" : "Use kg", systemImage: "scalemass")
+                    }
+                    Divider()
+                    Button {
+                        saveIntensityDisplayForCurrentWorkout(display: "rpe")
+                    } label: {
+                        Label(exerciseIntensityDisplay == "rpe" ? "Use RPE (current)" : "Use RPE", systemImage: "gauge.with.dots.needle.67percent")
+                    }
+                    Button {
+                        saveIntensityDisplayForCurrentWorkout(display: "rir")
+                    } label: {
+                        Label(exerciseIntensityDisplay == "rir" ? "Use RIR (current)" : "Use RIR", systemImage: "gauge.with.dots.needle.33percent")
                     }
                     Divider()
                     Button {
@@ -547,27 +621,28 @@ struct WorkoutEditorView: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis")
-                        .font(.caption2)
+                        .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 2)
+            .padding(.bottom, 8)
 
-            // Table header
-            HStack(spacing: 2) {
+            // Table header (widths and spacing must match SheetSetRow for alignment)
+            HStack(spacing: 6) {
                 Text("Set")
                     .frame(width: 24, alignment: .leading)
                 Text("Previous")
                     .frame(maxWidth: .infinity)
-                Text(weightUnit)
+                Text(exerciseWeightUnit)
                     .frame(width: 48, alignment: .center)
                 Text("Reps")
                     .frame(width: 40, alignment: .center)
-                Image(systemName: "checkmark")
-                    .frame(width: 28, alignment: .trailing)
+                Text(exerciseIntensityDisplay == "rpe" ? "RPE" : "RIR")
+                    .frame(width: 40, alignment: .center)
             }
-            .font(.system(size: 10))
+            .font(.system(size: 12))
             .foregroundStyle(.tertiary)
             .padding(.horizontal, 16)
 
@@ -575,57 +650,31 @@ struct WorkoutEditorView: View {
             let previousSets = previousPerformanceByExerciseId[exercise.exerciseId] ?? []
             ForEach(Array(exercise.sets.enumerated()), id: \.element.id) { index, set in
                 if index > 0 {
-                    // Rest timer bar between sets — editable inline
-                    ZStack {
-                        Rectangle()
-                            .fill(Color(red: 0.2, green: 0.4, blue: 1.0).opacity(0.15))
-                            .frame(height: 0.5)
-
-                        TextField(
-                            "0:00", text: $restTimeEditText,
-                            onCommit: {
-                                commitRestTimeEdit()
-                            }
-                        )
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(Color(red: 0.2, green: 0.4, blue: 1.0))
-                        .multilineTextAlignment(.center)
-                        .keyboardType(.numbersAndPunctuation)
-                        .frame(width: 36)
-                        .padding(.horizontal, 2)
-                        .background(Color(UIColor.systemBackground))
-                        .onTapGesture {
-                            isEditingRestTime = true
-                            restTimeEditText = restTimeFormatted
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .frame(height: 14)
+                    let setAbove = exercise.sets[index - 1]
+                    restTimerBar(setAbove: setAbove)
                 }
 
                 let previousSet = index < previousSets.count ? previousSets[index] : nil
                 SheetSetRow(
                     set: set,
-                    previousText: formatPreviousSet(previousSet),
-                    isCompleted: set.isCompleted == true,
-                    onToggleComplete: {
-                        let newValue = !(set.isCompleted == true)
-                        do {
-                            try workoutStore.toggleSetCompleted(setId: set.id, completed: newValue)
-                        } catch {}
-                        reloadPreservingTitleEdits()
-                        if newValue {
-                            onSetCompleted?()
+                    previousText: formatPreviousSet(previousSet, displayWeightUnit: exerciseWeightUnit),
+                    useRPE: exerciseIntensityDisplay == "rpe",
+                    weightInLbs: set.weight,
+                    displayWeightUnit: exerciseWeightUnit,
+                    onChange: { weight, reps, intensity, isWarmUp in
+                        let weightLbs = weight.map { w in
+                            exerciseWeightUnit == "kg" ? w * 2.20462 : w
                         }
-                    },
-                    onChange: { weight, reps, _, _ in
+                        let rpe = intensity.map { val in
+                            exerciseIntensityDisplay == "rpe" ? val : 10 - val
+                        }
                         do {
                             try workoutStore.updateSet(
                                 setId: set.id,
-                                weight: weight,
+                                weight: weightLbs,
                                 reps: reps,
-                                rir: set.rir,
-                                isWarmUp: set.isWarmUp
+                                rpe: rpe,
+                                isWarmUp: isWarmUp ?? set.isWarmUp
                             )
                         } catch {}
                         reloadPreservingTitleEdits()
@@ -636,21 +685,23 @@ struct WorkoutEditorView: View {
                             case .normal:
                                 try workoutStore.updateSet(
                                     setId: set.id, weight: set.weight, reps: set.reps,
-                                    rir: nil, isWarmUp: false)
+                                    rpe: nil, isWarmUp: false)
                             case .warmUp:
                                 try workoutStore.updateSet(
                                     setId: set.id, weight: set.weight, reps: set.reps,
-                                    rir: set.rir, isWarmUp: true)
+                                    rpe: set.rpe, isWarmUp: true)
                             case .failure:
                                 try workoutStore.updateSet(
                                     setId: set.id, weight: set.weight, reps: set.reps,
-                                    rir: 0, isWarmUp: false)
+                                    rpe: 10, isWarmUp: false)
                             }
                         } catch {}
                         reloadPreservingTitleEdits()
                     },
                     onDelete: {
-                        withAnimation(.easeInOut(duration: 0.25)) {
+                        var t = Transaction()
+                        t.disablesAnimations = true
+                        withTransaction(t) {
                             do {
                                 try workoutStore.deleteSet(setId: set.id)
                             } catch {}
@@ -662,16 +713,20 @@ struct WorkoutEditorView: View {
 
             // Add Set
             Button {
-                do {
-                    try workoutStore.addSet(workoutExerciseId: exercise.id)
-                } catch {}
-                reloadPreservingTitleEdits()
+                var t = Transaction()
+                t.disablesAnimations = true
+                withTransaction(t) {
+                    do {
+                        try workoutStore.addSet(workoutExerciseId: exercise.id)
+                    } catch {}
+                    reloadPreservingTitleEdits()
+                }
             } label: {
                 HStack(spacing: 3) {
                     Image(systemName: "plus")
-                        .font(.system(size: 9))
+                        .font(.system(size: 11))
                     Text("Add Set (\(restTimeFormatted))")
-                        .font(.system(size: 11, weight: .medium))
+                        .font(.system(size: 14, weight: .medium))
                 }
                 .foregroundStyle(Color(.systemGray))
                 .frame(maxWidth: .infinity)
@@ -681,7 +736,7 @@ struct WorkoutEditorView: View {
             }
             .buttonStyle(ScaleButtonStyle())
             .padding(.horizontal, 16)
-            .padding(.top, 1)
+            .padding(.top, 10)
         }
     }
 
@@ -1002,8 +1057,10 @@ private struct SheetSetRow: View {
     let set: WorkoutSetDetail
     /// Previous performance for this set (e.g. "50 × 10" or "—").
     let previousText: String
-    let isCompleted: Bool
-    let onToggleComplete: () -> Void
+    let useRPE: Bool
+    /// Weight in lbs (DB canonical).
+    let weightInLbs: Double?
+    let displayWeightUnit: String
     let onChange: (Double?, Int?, Double?, Bool?) -> Void
     /// Called when the set type (warm-up / failure) changes.
     let onSetTypeChanged: (SetType) -> Void
@@ -1011,11 +1068,23 @@ private struct SheetSetRow: View {
     let onDelete: () -> Void
 
     private enum Field: Hashable {
-        case weight, reps
+        case weight, reps, intensity
+    }
+
+    /// Display weight (kg or lbs depending on preference).
+    private var displayWeight: Double? {
+        guard let lbs = weightInLbs else { return nil }
+        return displayWeightUnit == "kg" ? lbs / 2.20462 : lbs
+    }
+    /// Display intensity (RPE or RIR depending on preference).
+    private var displayIntensity: Double? {
+        guard let rpe = set.rpe else { return nil }
+        return useRPE ? rpe : 10 - rpe
     }
 
     @State private var weightText: String = ""
     @State private var repsText: String = ""
+    @State private var intensityText: String = ""
     @State private var swipeOffset: CGFloat = 0
     @State private var showDeleteConfirm: Bool = false
     @State private var setType: SetType = .normal
@@ -1034,7 +1103,7 @@ private struct SheetSetRow: View {
     }
 
     private func commit() {
-        onChange(parseDouble(weightText), parseInt(repsText), nil, nil)
+        onChange(parseDouble(weightText), parseInt(repsText), parseDouble(intensityText), nil)
     }
 
     /// The label shown in the set number column.
@@ -1064,13 +1133,81 @@ private struct SheetSetRow: View {
         }
     }
 
+    private var setRowContent: some View {
+        HStack(spacing: 6) {
+            Button {
+                setType = setType.next
+                onSetTypeChanged(setType)
+            } label: {
+                Text(setLabel)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(setLabelColor)
+                    .frame(width: 20, height: 20)
+                    .background(setLabelBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .frame(width: 24, alignment: .leading)
+
+            Text(previousText)
+                .font(.system(size: 15))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .frame(maxWidth: .infinity)
+
+            TextField("", text: $weightText)
+                .focused($focusedField, equals: .weight)
+                .keyboardType(.decimalPad)
+                .multilineTextAlignment(.center)
+                .font(.system(size: 15))
+                .frame(width: 48, height: 32)
+                .background(Color(.systemGray6))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(focusedField == .weight ? Color.accentColor : Color.clear, lineWidth: 2)
+                )
+                .onSubmit { focusedField = nil }
+
+            TextField("", text: $repsText)
+                .focused($focusedField, equals: .reps)
+                .keyboardType(.numberPad)
+                .multilineTextAlignment(.center)
+                .font(.system(size: 15))
+                .frame(width: 40, height: 32)
+                .background(Color(.systemGray6))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(focusedField == .reps ? Color.accentColor : Color.clear, lineWidth: 2)
+                )
+                .onSubmit { focusedField = nil }
+
+            TextField("", text: $intensityText)
+                .focused($focusedField, equals: .intensity)
+                .keyboardType(.decimalPad)
+                .multilineTextAlignment(.center)
+                .font(.system(size: 15))
+                .frame(width: 40, height: 32)
+                .background(Color(.systemGray6))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(focusedField == .intensity ? Color.accentColor : Color.clear, lineWidth: 2)
+                )
+                .onSubmit { focusedField = nil }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 0)
+        .background(Color(UIColor.systemBackground))
+    }
+
     var body: some View {
         ZStack(alignment: .trailing) {
             // Delete background revealed on swipe
             Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    onDelete()
-                }
+                onDelete()
             } label: {
                 Rectangle()
                     .fill(Color(red: 0.9, green: 0.25, blue: 0.25))
@@ -1086,116 +1223,65 @@ private struct SheetSetRow: View {
             }
             .buttonStyle(.plain)
 
-            // Main row content
-            HStack(spacing: 2) {
-                // Tappable set type badge
-                Button {
-                    withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
-                        setType = setType.next
+            // Main row content (spacing and widths must match table header); swipe lives on hosting view so scroll is not blocked
+            SetRowWithSwipe(
+                content: setRowContent,
+                onSwipeLeft: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        swipeOffset = -70
                     }
-                    onSetTypeChanged(setType)
-                } label: {
-                    Text(setLabel)
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(setLabelColor)
-                        .frame(width: 20, height: 20)
-                        .background(setLabelBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                 }
-                .buttonStyle(.plain)
-                .frame(width: 24, alignment: .leading)
-
-                Text(previousText)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .frame(maxWidth: .infinity)
-
-                TextField("", text: $weightText)
-                    .focused($focusedField, equals: .weight)
-                    .keyboardType(.decimalPad)
-                    .multilineTextAlignment(.center)
-                    .font(.system(size: 12))
-                    .frame(width: 48)
-                    .padding(.vertical, 3)
-                    .background(Color(.systemGray6))
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(focusedField == .weight ? Color.accentColor : Color.clear, lineWidth: 2)
-                    )
-                    .onSubmit { focusedField = nil }
-
-                Spacer().frame(width: 8)
-
-                TextField("", text: $repsText)
-                    .focused($focusedField, equals: .reps)
-                    .keyboardType(.numberPad)
-                    .multilineTextAlignment(.center)
-                    .font(.system(size: 12))
-                    .frame(width: 40)
-                    .padding(.vertical, 3)
-                    .background(Color(.systemGray6))
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .stroke(focusedField == .reps ? Color.accentColor : Color.clear, lineWidth: 2)
-                    )
-                    .onSubmit { focusedField = nil }
-
-                Button {
-                    focusedField = nil
-                    onToggleComplete()
-                } label: {
-                    Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
-                        .font(.body)
-                        .foregroundStyle(
-                            isCompleted ? Color.green : .secondary)
-                }
-                .buttonStyle(.plain)
-                .frame(width: 28, alignment: .trailing)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 0)
-            .background(Color(UIColor.systemBackground))
-            .offset(x: swipeOffset)
-            .gesture(
-                DragGesture(minimumDistance: 20)
-                    .onChanged { value in
-                        if value.translation.width < 0 {
-                            swipeOffset = max(value.translation.width, -80)
-                        } else if swipeOffset < 0 {
-                            swipeOffset = min(0, swipeOffset + value.translation.width)
-                        }
-                    }
-                    .onEnded { value in
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            if swipeOffset < -50 {
-                                swipeOffset = -70
-                            } else {
-                                swipeOffset = 0
-                            }
-                        }
-                    }
             )
+            .offset(x: swipeOffset)
+
+            if swipeOffset < 0 {
+                Color.clear
+                    .contentShape(.rect)
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            swipeOffset = 0
+                        }
+                    }
+            }
         }
         .clipped()
         .onAppear {
-            weightText =
-                set.weight.map { $0 == Double(Int($0)) ? String(Int($0)) : String($0) } ?? ""
-            repsText = set.reps.map { String($0) } ?? ""
+            refreshDisplayFromPreferences()
             // Restore set type from model
             if set.isWarmUp == true {
                 setType = .warmUp
-            } else if set.rir == 0 {
+            } else if set.rpe == 10 {
                 setType = .failure
             } else {
                 setType = .normal
             }
         }
+        .onChange(of: displayWeightUnit) { _, _ in refreshDisplayFromPreferences() }
+        .onChange(of: useRPE) { _, _ in refreshDisplayFromPreferences() }
         .onChange(of: weightText) { _, _ in commit() }
         .onChange(of: repsText) { _, _ in commit() }
+        .onChange(of: intensityText) { _, _ in commit() }
+    }
+
+    /// Rounds to nearest tenth for display.
+    private func roundedToTenth(_ value: Double) -> Double {
+        (value * 10).rounded() / 10
+    }
+
+    private func refreshDisplayFromPreferences() {
+        if let w = displayWeight {
+            let r = roundedToTenth(w)
+            weightText = r == Double(Int(r)) ? String(Int(r)) : String(format: "%.1f", r)
+        } else {
+            weightText = ""
+        }
+        repsText = set.reps.map { String($0) } ?? ""
+        if let i = displayIntensity {
+            let r = roundedToTenth(i)
+            intensityText = r == Double(Int(r)) ? String(Int(r)) : String(format: "%.1f", r)
+        } else {
+            intensityText = ""
+        }
     }
 }
 
@@ -1330,9 +1416,7 @@ private struct RestTimePickerSheet: View {
                     ForEach(options, id: \.self) { seconds in
                         let isSelected = restTimeSeconds == seconds
                         Button {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                restTimeSeconds = seconds
-                            }
+                            restTimeSeconds = seconds
                         } label: {
                             Text(
                                 seconds < 60
@@ -1369,10 +1453,69 @@ private struct RestTimePickerSheet: View {
     }
 }
 
+// MARK: - Rest timer bar (between sets, highlight when selected)
+
+private struct RestTimerBarView: View {
+    let setAbove: WorkoutSetDetail
+    @Binding var restTimeEditText: String
+    @Binding var editingRestSetId: String?
+    let formatRestSeconds: (Int?) -> String
+    let onTap: () -> Void
+    let onCommit: () -> Void
+
+    private var isSelected: Bool {
+        editingRestSetId == setAbove.id
+    }
+
+    private var displayText: String {
+        isSelected ? restTimeEditText : formatRestSeconds(setAbove.restTimerSeconds)
+    }
+
+    var body: some View {
+        HStack {
+            ZStack {
+                Rectangle()
+                    .fill(
+                        isSelected
+                            ? Color(red: 0.2, green: 0.4, blue: 1.0).opacity(0.35)
+                            : Color(red: 0.2, green: 0.4, blue: 1.0).opacity(0.15)
+                    )
+                    .frame(height: 0.5)
+
+                if isSelected {
+                    TextField("0:00", text: $restTimeEditText, onCommit: onCommit)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color(red: 0.2, green: 0.4, blue: 1.0))
+                        .multilineTextAlignment(.center)
+                        .keyboardType(.numbersAndPunctuation)
+                        .frame(width: 36)
+                        .padding(.horizontal, 2)
+                        .padding(.vertical, 4)
+                        .background(Color(UIColor.systemBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                } else {
+                    Text(displayText)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color(red: 0.2, green: 0.4, blue: 1.0))
+                        .frame(width: 36)
+                        .contentShape(Rectangle())
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 18)
+            .onTapGesture {
+                onTap()
+            }
+        }
+        .padding(.horizontal, 16)
+        .background(Color(UIColor.systemBackground))
+        .frame(height: 18)
+    }
+}
+
 private struct ScaleButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.96 : 1)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
     }
 }
