@@ -66,7 +66,7 @@ final class AppDatabase {
     }
 
     /// Stable identifier so re-seeding does not break foreign keys.
-    static func stableID(for exerciseName: String) -> String {
+    nonisolated static func stableID(for exerciseName: String) -> String {
         let digest = SHA256.hash(data: Data(exerciseName.utf8))
         var bytes = Array(digest.prefix(16))
 
