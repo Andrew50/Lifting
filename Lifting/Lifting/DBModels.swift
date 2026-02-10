@@ -170,6 +170,7 @@ struct WorkoutSetRecord: Codable, FetchableRecord, PersistableRecord, TableRecor
     var rpe: Double?
     var rir: Double?
     var isWarmUp: Bool?
+    var isCompleted: Bool?
     var restTimerSeconds: Int?
 
     enum CodingKeys: String, CodingKey {
@@ -178,6 +179,7 @@ struct WorkoutSetRecord: Codable, FetchableRecord, PersistableRecord, TableRecor
         case sortOrder = "sort_order"
         case weight, reps, distance, seconds, notes, rpe, rir
         case isWarmUp = "is_warm_up"
+        case isCompleted = "is_completed"
         case restTimerSeconds = "rest_timer_seconds"
     }
 
@@ -187,6 +189,7 @@ struct WorkoutSetRecord: Codable, FetchableRecord, PersistableRecord, TableRecor
         case sortOrder = "sort_order"
         case weight, reps, distance, seconds, notes, rpe, rir
         case isWarmUp = "is_warm_up"
+        case isCompleted = "is_completed"
         case restTimerSeconds = "rest_timer_seconds"
     }
 }
@@ -227,6 +230,7 @@ struct WorkoutSetDetail: Identifiable, Hashable {
     var reps: Int?
     var rir: Double?
     var isWarmUp: Bool?
+    var isCompleted: Bool?
     var restTimerSeconds: Int?
 }
 

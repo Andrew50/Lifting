@@ -448,6 +448,7 @@ final class WorkoutStore: ObservableObject {
                         reps: s.reps,
                         rir: s.rir,
                         isWarmUp: s.isWarmUp,
+                        isCompleted: s.isCompleted,
                         restTimerSeconds: s.restTimerSeconds
                     )
                 }
@@ -608,6 +609,7 @@ final class WorkoutStore: ObservableObject {
         reps: Int?,
         rir: Double?,
         isWarmUp: Bool? = nil,
+        isCompleted: Bool? = nil,
         restTimerSeconds: Int? = nil
     ) throws {
         try dbQueue.write { db in
@@ -616,9 +618,19 @@ final class WorkoutStore: ObservableObject {
                 if let reps { set.reps = reps }
                 if let rir { set.rir = rir }
                 if let isWarmUp { set.isWarmUp = isWarmUp }
+                if let isCompleted { set.isCompleted = isCompleted }
                 if let restTimerSeconds { set.restTimerSeconds = restTimerSeconds }
                 try set.update(db)
             }
+        }
+    }
+
+    func toggleSetCompleted(setId: String, completed: Bool) throws {
+        try dbQueue.write { db in
+            try db.execute(
+                sql: "UPDATE workout_sets SET is_completed = ? WHERE id = ?",
+                arguments: [completed ? 1 : 0, setId]
+            )
         }
     }
 

@@ -194,7 +194,9 @@ struct ProfileView: View {
             } header: {
                 Text("Danger Zone")
             } footer: {
-                Text("This will permanently delete all your workout history. Your exercise list will be preserved.")
+                Text(
+                    "This will permanently delete all your workout history. Your exercise list will be preserved."
+                )
             }
 
             Section {
@@ -219,7 +221,8 @@ struct ProfileView: View {
         case .success(let urls):
             guard let url = urls.first else { return }
             isImporting = true
-            
+
+
             Task {
                 // Gain access to the file if it's from outside the app sandbox (e.g. iCloud)
                 let accessed = url.startAccessingSecurityScopedResource()
@@ -248,7 +251,8 @@ struct ProfileView: View {
         if result.skippedBecauseAlreadyImported {
             importMessage = "Already imported previously."
         } else {
-            importMessage = "Successfully imported:\n\(result.workoutsInserted) Workouts\n\(result.setsInserted) Sets\n\(result.exercisesInsertedOrIgnored) Exercises"
+            importMessage =
+                "Successfully imported:\n\(result.workoutsInserted) Workouts\n\(result.setsInserted) Sets\n\(result.exercisesInsertedOrIgnored) Exercises"
         }
         showImportAlert = true
     }

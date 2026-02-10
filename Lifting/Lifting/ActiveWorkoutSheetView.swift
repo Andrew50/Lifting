@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct ActiveWorkoutSheetView: View {
     @ObservedObject var templateStore: TemplateStore
@@ -20,6 +21,11 @@ struct ActiveWorkoutSheetView: View {
     @State private var showFinishConfirmation = false
     @State private var emptySetsCount = 0
 
+    // Rest countdown timer
+    @State private var restCountdownRemaining: Int = 0
+    @State private var restCountdownActive: Bool = false
+    @State private var restCountdownTimer: AnyCancellable?
+
     private let restTimeOptions = [30, 45, 60, 90, 120, 180]
 
     private func formatElapsed(_ startedAt: TimeInterval?) -> String {
@@ -31,16 +37,61 @@ struct ActiveWorkoutSheetView: View {
         return String(format: "%d:%02d", min, sec)
     }
 
+    private func formatCountdown(_ seconds: Int) -> String {
+        let min = seconds / 60
+        let sec = seconds % 60
+        return String(format: "%d:%02d", min, sec)
+    }
+
+    private func startRestCountdown() {
+        restCountdownRemaining = restTimeSeconds
+        restCountdownActive = true
+        restCountdownTimer?.cancel()
+        restCountdownTimer = Timer.publish(every: 1, on: .main, in: .common)
+            .autoconnect()
+            .sink { _ in
+                if restCountdownRemaining > 0 {
+                    restCountdownRemaining -= 1
+                } else {
+                    stopRestCountdown()
+                }
+            }
+    }
+
+    private func stopRestCountdown() {
+        restCountdownActive = false
+        restCountdownRemaining = 0
+        restCountdownTimer?.cancel()
+        restCountdownTimer = nil
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            // Header: clock (left), elapsed timer (center), Finish (right)
+            // Header: clock (left), elapsed timer or countdown (center), Finish (right)
             ZStack {
-                // Center: elapsed timer
-                TimelineView(.periodic(from: .now, by: 1.0)) { _ in
-                    Text(formatElapsed(workoutStartedAt))
-                        .font(.title3.monospacedDigit())
-                        .fontWeight(.medium)
-                        .foregroundStyle(.secondary)
+                // Center: elapsed timer or rest countdown
+                if restCountdownActive {
+                    VStack(spacing: 2) {
+                        Text("Rest")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        Text(formatCountdown(restCountdownRemaining))
+                            .font(.title2.monospacedDigit())
+                            .fontWeight(.semibold)
+                            .foregroundStyle(restCountdownRemaining <= 10 ? Color.orange : Color.blue)
+                    }
+                    .onTapGesture {
+                        stopRestCountdown()
+                    }
+                    .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                } else {
+                    TimelineView(.periodic(from: .now, by: 1.0)) { _ in
+                        Text(formatElapsed(workoutStartedAt))
+                            .font(.title3.monospacedDigit())
+                            .fontWeight(.medium)
+                            .foregroundStyle(.secondary)
+                    }
+                    .transition(.opacity.combined(with: .scale(scale: 0.8)))
                 }
 
                 HStack {
@@ -83,6 +134,7 @@ struct ActiveWorkoutSheetView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .background(Color(UIColor.systemBackground))
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: restCountdownActive)
             .alert(
                 "Finish Workout?",
                 isPresented: $showFinishConfirmation
@@ -115,7 +167,10 @@ struct ActiveWorkoutSheetView: View {
                     exerciseStore: exerciseStore,
                     subject: .workout(id: workoutId),
                     onFinish: onDismiss,
-                    restTimeSeconds: $restTimeSeconds
+                    restTimeSeconds: $restTimeSeconds,
+                    onSetCompleted: {
+                        startRestCountdown()
+                    }
                 )
             }
         }
