@@ -123,7 +123,7 @@ struct ExerciseHistoryView: View {
         ExerciseHistoryView(
             exerciseId: "preview-id",
             exerciseName: "Bench Press",
-            workoutStore: try! AppContainer().workoutStore
+            workoutStore: AppContainer().workoutStore
         )
     }
 }

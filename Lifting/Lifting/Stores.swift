@@ -265,7 +265,7 @@ final class WorkoutStore: ObservableObject {
     }
 
     /// Default workout name based on time of day: "Morning Workout", "Afternoon Workout", or "Evening Workout".
-    static func defaultWorkoutName(for date: Date = Date()) -> String {
+    nonisolated static func defaultWorkoutName(for date: Date = Date()) -> String {
         let hour = Calendar.current.component(.hour, from: date)
         if hour < 12 { return "Morning Workout" }
         if hour < 18 { return "Afternoon Workout" }

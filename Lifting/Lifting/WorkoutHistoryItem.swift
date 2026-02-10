@@ -12,7 +12,7 @@ struct WorkoutHistoryItem: Identifiable, Hashable {
     var name: String
     var date: Date
 
-    init(id: UUID = UUID(), name: String, date: Date) {
+    nonisolated init(id: UUID = UUID(), name: String, date: Date) {
         self.id = id
         self.name = name
         self.date = date

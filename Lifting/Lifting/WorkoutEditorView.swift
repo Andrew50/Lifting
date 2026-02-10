@@ -501,13 +501,6 @@ struct WorkoutEditorView: View {
                 .buttonStyle(.plain)
 
                 Spacer()
-                Button {
-                } label: {
-                    Image(systemName: "link")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
                 Menu {
                     Button {
                         isShowingNoteEditor = true
@@ -800,7 +793,7 @@ struct WorkoutEditorView: View {
             hasLoadedInitialTitle = true
             restTimeEditText = restTimeFormatted
         }
-        .onChange(of: restTimeSeconds) { _ in
+        .onChange(of: restTimeSeconds) { oldValue, newValue in
             if !isEditingRestTime {
                 restTimeEditText = restTimeFormatted
             }

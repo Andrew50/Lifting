@@ -58,7 +58,7 @@ final class CSVImporter {
         return result
     }
 
-    private static func importCSV(at url: URL, dbQueue: DatabaseQueue) throws -> ImportResult {
+    nonisolated private static func importCSV(at url: URL, dbQueue: DatabaseQueue) throws -> ImportResult {
         let data = try Data(contentsOf: url)
         let contents = String(decoding: data, as: UTF8.self)
 
@@ -275,7 +275,7 @@ final class CSVImporter {
     }
 
     /// Minimal CSV parser with support for quoted fields and newlines inside quotes.
-    private static func parseCSV(_ input: String) -> [[String]] {
+    nonisolated private static func parseCSV(_ input: String) -> [[String]] {
         var rows: [[String]] = []
         var row: [String] = []
         var field = ""
@@ -335,7 +335,7 @@ final class CSVImporter {
         return rows
     }
 
-    private static func parseDurationSeconds(_ raw: String) -> TimeInterval? {
+    nonisolated private static func parseDurationSeconds(_ raw: String) -> TimeInterval? {
         let s = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !s.isEmpty else { return nil }
 
@@ -365,7 +365,7 @@ final class CSVImporter {
         return parsedAny ? total : nil
     }
 
-    private static func parseIntLossy(_ raw: String) -> Int? {
+    nonisolated private static func parseIntLossy(_ raw: String) -> Int? {
         let t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty else { return nil }
         if let i = Int(t) { return i }
