@@ -548,10 +548,13 @@ struct WorkoutEditorView: View {
                     .frame(maxWidth: .infinity)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Text("+lbs")
+                Text("lbs")
                     .frame(width: 56, alignment: .center)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                Spacer().frame(width: 8)
+
                 Text("Reps")
                     .frame(width: 48, alignment: .center)
                     .font(.caption)
@@ -1009,6 +1012,12 @@ private struct SheetSetRow: View {
     @State private var showDeleteConfirm: Bool = false
     @State private var setType: SetType = .normal
 
+    @FocusState private var focusedField: Field?
+
+    enum Field: Hashable {
+        case weight, reps
+    }
+
     private func parseDouble(_ text: String) -> Double? {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty else { return nil }
@@ -1055,21 +1064,24 @@ private struct SheetSetRow: View {
     var body: some View {
         ZStack(alignment: .trailing) {
             // Delete background revealed on swipe
-            HStack {
-                Spacer()
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        onDelete()
-                    }
-                } label: {
-                    Image(systemName: "trash.fill")
-                        .font(.body)
-                        .foregroundStyle(.white)
-                        .frame(width: 60, height: .infinity)
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    onDelete()
                 }
-                .frame(width: 70)
+            } label: {
+                Rectangle()
+                    .fill(Color(red: 0.9, green: 0.25, blue: 0.25))
+                    .overlay(
+                        HStack {
+                            Spacer()
+                            Image(systemName: "trash.fill")
+                                .font(.body)
+                                .foregroundStyle(.white)
+                                .frame(width: 70)
+                        }
+                    )
             }
-            .background(Color(red: 0.9, green: 0.25, blue: 0.25))
+            .buttonStyle(.plain)
 
             // Main row content
             HStack(spacing: 0) {
@@ -1099,6 +1111,7 @@ private struct SheetSetRow: View {
                     .frame(maxWidth: .infinity)
 
                 TextField("", text: $weightText)
+                    .focused($focusedField, equals: .weight)
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.center)
                     .font(.subheadline)
@@ -1106,8 +1119,15 @@ private struct SheetSetRow: View {
                     .padding(.vertical, 8)
                     .background(Color(.systemGray6))
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(focusedField == .weight ? Color.accentColor : Color.clear, lineWidth: 2)
+                    )
+
+                Spacer().frame(width: 8)
 
                 TextField("", text: $repsText)
+                    .focused($focusedField, equals: .reps)
                     .keyboardType(.numberPad)
                     .multilineTextAlignment(.center)
                     .font(.subheadline)
@@ -1115,6 +1135,10 @@ private struct SheetSetRow: View {
                     .padding(.vertical, 8)
                     .background(Color(.systemGray6))
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(focusedField == .reps ? Color.accentColor : Color.clear, lineWidth: 2)
+                    )
 
                 Button(action: onToggleComplete) {
                     Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")

@@ -101,10 +101,10 @@ struct ExerciseHistoryView: View {
     }
 
     private func loadHistory() {
-        do {
-            entries = try workoutStore.fetchExerciseHistory(exerciseId: exerciseId)
+        if let results = try? workoutStore.fetchExerciseHistory(exerciseId: exerciseId) {
+            entries = results
             loadError = false
-        } catch {
+        } else {
             entries = []
             loadError = true
         }
