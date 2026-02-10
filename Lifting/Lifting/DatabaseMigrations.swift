@@ -42,7 +42,7 @@ enum DatabaseMigrations {
             try db.create(table: "workouts", ifNotExists: true) { t in
                 t.column("id", .text).primaryKey()
                 t.column("name", .text).notNull()
-                t.column("status", .integer).notNull() // 0=pending, 1=completed
+                t.column("status", .integer).notNull()  // 0=pending, 1=completed
                 t.column("source_template_id", .text)
                     .references("templates", onDelete: .setNull)
                 t.column("started_at", .double).notNull()
@@ -52,11 +52,12 @@ enum DatabaseMigrations {
             }
 
             // Ensure only one pending workout can exist.
-            try db.execute(sql: """
-                CREATE UNIQUE INDEX IF NOT EXISTS workouts_unique_pending
-                ON workouts(status)
-                WHERE status = 0
-                """)
+            try db.execute(
+                sql: """
+                    CREATE UNIQUE INDEX IF NOT EXISTS workouts_unique_pending
+                    ON workouts(status)
+                    WHERE status = 0
+                    """)
 
             try db.create(table: "workout_exercises", ifNotExists: true) { t in
                 t.column("id", .text).primaryKey()
@@ -100,9 +101,13 @@ enum DatabaseMigrations {
             }
         }
 
-        migrator.registerMigration("v4_add_workout_notes") { db in
-            try db.alter(table: "workouts") { t in
-                t.add(column: "notes", .text)
+        migrator.registerMigration("v5_add_workout_notes") { db in
+            let columns = try Row.fetchAll(db, sql: "PRAGMA table_info(workouts)")
+            let hasNotes = columns.contains { ($0["name"] as String) == "notes" }
+            if !hasNotes {
+                try db.alter(table: "workouts") { t in
+                    t.add(column: "notes", .text)
+                }
             }
         }
 
@@ -125,7 +130,16 @@ enum DatabaseMigrations {
             try db.create(index: "idx_workouts_status_completed_at", on: "workouts", columns: ["status", "completed_at"])
         }
 
+        migrator.registerMigration("v8_add_set_completed") { db in
+            let columns = try Row.fetchAll(db, sql: "PRAGMA table_info(workout_sets)")
+            let hasColumn = columns.contains { ($0["name"] as String) == "is_completed" }
+            if !hasColumn {
+                try db.alter(table: "workout_sets") { t in
+                    t.add(column: "is_completed", .integer).defaults(to: 0)
+                }
+            }
+        }
+
         return migrator
     }()
 }
-
