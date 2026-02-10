@@ -82,7 +82,7 @@ struct ActiveWorkoutSheetView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(Color.white)
+            .background(Color(UIColor.systemBackground))
             .alert(
                 "Finish Workout?",
                 isPresented: $showFinishConfirmation
@@ -119,7 +119,7 @@ struct ActiveWorkoutSheetView: View {
                 )
             }
         }
-        .background(Color.white)
+        .background(Color(UIColor.systemBackground))
         .onAppear {
             if let workout = try? workoutStore.fetchWorkout(workoutId: workoutId) {
                 workoutStartedAt = workout.startedAt

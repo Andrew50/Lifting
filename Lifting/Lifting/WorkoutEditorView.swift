@@ -388,7 +388,7 @@ struct WorkoutEditorView: View {
                     .padding(.horizontal, 20)
                     .padding(.vertical, 10)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(red: 0.93, green: 0.95, blue: 1.0))
+                    .background(Color(.secondarySystemBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .padding(.horizontal, 20)
                     .onTapGesture {
@@ -412,10 +412,10 @@ struct WorkoutEditorView: View {
                             .font(.subheadline)
                             .fontWeight(.medium)
                     }
-                    .foregroundStyle(Color(red: 0.2, green: 0.4, blue: 1.0))
+                    .foregroundStyle(Color.accentColor)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
-                    .background(Color(red: 0.2, green: 0.4, blue: 1.0).opacity(0.1))
+                    .background(Color.accentColor.opacity(0.1))
                     .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
                 .buttonStyle(ScaleButtonStyle())
@@ -429,10 +429,10 @@ struct WorkoutEditorView: View {
                     } label: {
                         Text("Cancel Workout")
                             .font(.headline)
-                            .foregroundStyle(Color(red: 0.9, green: 0.3, blue: 0.3))
+                            .foregroundStyle(.red)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
-                            .background(Color(red: 1.0, green: 0.9, blue: 0.9))
+                            .background(Color.red.opacity(0.1))
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
                     .buttonStyle(ScaleButtonStyle())
@@ -471,10 +471,10 @@ struct WorkoutEditorView: View {
                     } label: {
                         Text("Delete Workout")
                             .font(.headline)
-                            .foregroundStyle(Color(red: 0.9, green: 0.3, blue: 0.3))
+                            .foregroundStyle(.red)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
-                            .background(Color(red: 1.0, green: 0.9, blue: 0.9))
+                            .background(Color.red.opacity(0.1))
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
                     .buttonStyle(ScaleButtonStyle())
@@ -596,7 +596,7 @@ struct WorkoutEditorView: View {
                         .frame(width: 48)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Color.white)
+                        .background(Color(UIColor.systemBackground))
                         .onTapGesture {
                             isEditingRestTime = true
                             restTimeEditText = restTimeFormatted
@@ -696,7 +696,7 @@ struct WorkoutEditorView: View {
             }
         }
         .scrollContentBackground(.hidden)
-        .background(Color.white)
+        .background(Color(UIColor.systemBackground))
         .navigationTitle(
             {
                 switch subject {
@@ -1134,7 +1134,7 @@ private struct SheetSetRow: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 6)
-            .background(Color.white)
+            .background(Color(UIColor.systemBackground))
             .offset(x: swipeOffset)
             .gesture(
                 DragGesture(minimumDistance: 20)

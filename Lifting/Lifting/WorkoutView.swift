@@ -79,7 +79,7 @@ struct WorkoutView: View {
                 }
             }
             .scrollContentBackground(.hidden)
-            .background(Color.white)
+            .background(Color(UIColor.systemBackground))
             .navigationTitle(greetingTitle)
             .navigationDestination(for: Route.self) { route in
                 switch route {
