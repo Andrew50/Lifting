@@ -52,14 +52,19 @@ final class AppDatabase {
             for exercise in strong.exercises {
                 let name = exercise.exerciseName.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !name.isEmpty else { continue }
+                let category = ExerciseCategoryInference.categorize(name: name)
 
                 let id = Self.stableID(for: name)
                 try db.execute(
                     sql: """
-                    INSERT OR IGNORE INTO exercises (id, name)
-                    VALUES (?, ?)
+                    INSERT INTO exercises (id, name, equipment, muscle_group)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(id) DO UPDATE SET
+                        name = excluded.name,
+                        equipment = excluded.equipment,
+                        muscle_group = excluded.muscle_group
                     """,
-                    arguments: [id, name]
+                    arguments: [id, name, category.equipment.rawValue, category.muscleGroup.rawValue]
                 )
             }
         }
@@ -82,6 +87,76 @@ final class AppDatabase {
             bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
         ))
         return uuid.uuidString
+    }
+}
+
+private enum ExerciseEquipment: String {
+    case dumbbell
+    case machine
+    case barbell
+}
+
+private enum MuscleGroup: String {
+    case chest
+    case shoulder
+    case back
+    case legs
+    case abs
+    case arms
+}
+
+private struct ExerciseCategory {
+    let equipment: ExerciseEquipment
+    let muscleGroup: MuscleGroup
+}
+
+private enum ExerciseCategoryInference {
+    static func categorize(name: String) -> ExerciseCategory {
+        let normalized = normalize(name)
+        return ExerciseCategory(
+            equipment: inferEquipment(from: normalized),
+            muscleGroup: inferMuscleGroup(from: normalized)
+        )
+    }
+
+    private static func inferEquipment(from name: String) -> ExerciseEquipment {
+        if containsAny(name, ["dumbbell", "dumbell", " db "]) {
+            return .dumbbell
+        }
+        if containsAny(name, ["barbell", " barbel", "smith machine", "trap bar", "hex bar"]) {
+            return .barbell
+        }
+        return .machine
+    }
+
+    private static func inferMuscleGroup(from name: String) -> MuscleGroup {
+        if containsAny(name, ["curl", "tricep", "triceps", "bicep", "biceps", "dip", "skullcrusher", "wrist"]) {
+            return .arms
+        }
+        if containsAny(name, ["squat", "deadlift", "rdl", "leg", "lunge", "calf", "glute", "hip", "ham", "adductor", "abductor"]) {
+            return .legs
+        }
+        if containsAny(name, ["crunch", "plank", "sit up", "sit-up", "knee raise", "leg raise", "v up", "twist", "abs", "ab "]) {
+            return .abs
+        }
+        if containsAny(name, ["bench", "chest", "pec", "crossover", "fly", "push up", "push-up", "press"]) {
+            return .chest
+        }
+        if containsAny(name, ["shoulder", "lateral raise", "front raise", "upright row", "overhead press", "full can"]) {
+            return .shoulder
+        }
+        return .back
+    }
+
+    private static func normalize(_ input: String) -> String {
+        " " + input
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .lowercased()
+            .replacingOccurrences(of: "-", with: " ") + " "
+    }
+
+    private static func containsAny(_ input: String, _ tokens: [String]) -> Bool {
+        tokens.contains { input.contains($0) }
     }
 }
 

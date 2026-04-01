@@ -16,7 +16,8 @@ private struct SetRowWithSwipe<Content: View>: UIViewRepresentable {
     func makeUIView(context: Context) -> UIView {
         let host = UIHostingController(rootView: content)
         host.view.backgroundColor = .clear
-        let swipe = UISwipeGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.didSwipeLeft(_:)))
+        let swipe = UISwipeGestureRecognizer(
+            target: context.coordinator, action: #selector(Coordinator.didSwipeLeft(_:)))
         swipe.direction = .left
         host.view.addGestureRecognizer(swipe)
         context.coordinator.host = host
@@ -308,7 +309,8 @@ struct WorkoutEditorView: View {
     private func commitRestTimeEdit() {
         if let setId = editingRestSetId {
             if let seconds = parseRestTime(restTimeEditText), seconds > 0 {
-                try? workoutStore.updateSet(setId: setId, weight: nil, reps: nil, restTimerSeconds: seconds)
+                try? workoutStore.updateSet(
+                    setId: setId, weight: nil, reps: nil, restTimerSeconds: seconds)
             }
             editingRestSetId = nil
             reloadPreservingTitleEdits()
@@ -350,7 +352,9 @@ struct WorkoutEditorView: View {
     }
 
     /// Formats previous set for display; weight is in lbs, converted to displayUnit, rounded to nearest tenth. "50 × 10", "50 lbs", "10 reps", or "—".
-    private func formatPreviousSet(_ previous: (weight: Double?, reps: Int?)?, displayWeightUnit: String) -> String {
+    private func formatPreviousSet(
+        _ previous: (weight: Double?, reps: Int?)?, displayWeightUnit: String
+    ) -> String {
         guard let prev = previous else { return "—" }
         let hasWeight = prev.weight != nil && prev.weight! > 0
         let hasReps = prev.reps != nil && prev.reps! > 0
@@ -360,14 +364,18 @@ struct WorkoutEditorView: View {
             let raw = displayWeightUnit == "kg" ? lbs / 2.20462 : lbs
             let displayW = roundedToTenth(raw)
             let r = prev.reps!
-            let wStr = displayW == Double(Int(displayW)) ? String(Int(displayW)) : String(format: "%.1f", displayW)
+            let wStr =
+                displayW == Double(Int(displayW))
+                ? String(Int(displayW)) : String(format: "%.1f", displayW)
             return "\(wStr) × \(r)"
         }
         if hasWeight {
             let lbs = prev.weight!
             let raw = displayWeightUnit == "kg" ? lbs / 2.20462 : lbs
             let displayW = roundedToTenth(raw)
-            let wStr = displayW == Double(Int(displayW)) ? String(Int(displayW)) : String(format: "%.1f", displayW)
+            let wStr =
+                displayW == Double(Int(displayW))
+                ? String(Int(displayW)) : String(format: "%.1f", displayW)
             return wStr + unitSuffix
         }
         if hasReps { return "\(prev.reps!) reps" }
@@ -553,7 +561,8 @@ struct WorkoutEditorView: View {
     private func sheetExerciseBlock(exercise: WorkoutExerciseDetail, workoutId: String) -> some View
     {
         let exerciseWeightUnit = DisplayPreferences.displayWeightUnit(for: exercise.exerciseId)
-        let exerciseIntensityDisplay = DisplayPreferences.displayIntensityDisplay(for: exercise.exerciseId)
+        let exerciseIntensityDisplay = DisplayPreferences.displayIntensityDisplay(
+            for: exercise.exerciseId)
         return VStack(alignment: .leading, spacing: 2) {
             // Exercise name (blue) + icons
             HStack(spacing: 6) {
@@ -583,23 +592,31 @@ struct WorkoutEditorView: View {
                     Button {
                         saveWeightUnitForCurrentWorkout(unit: "lbs")
                     } label: {
-                        Label(exerciseWeightUnit == "lbs" ? "Use lbs (current)" : "Use lbs", systemImage: "scalemass")
+                        Label(
+                            exerciseWeightUnit == "lbs" ? "Use lbs (current)" : "Use lbs",
+                            systemImage: "scalemass")
                     }
                     Button {
                         saveWeightUnitForCurrentWorkout(unit: "kg")
                     } label: {
-                        Label(exerciseWeightUnit == "kg" ? "Use kg (current)" : "Use kg", systemImage: "scalemass")
+                        Label(
+                            exerciseWeightUnit == "kg" ? "Use kg (current)" : "Use kg",
+                            systemImage: "scalemass")
                     }
                     Divider()
                     Button {
                         saveIntensityDisplayForCurrentWorkout(display: "rpe")
                     } label: {
-                        Label(exerciseIntensityDisplay == "rpe" ? "Use RPE (current)" : "Use RPE", systemImage: "gauge.with.dots.needle.67percent")
+                        Label(
+                            exerciseIntensityDisplay == "rpe" ? "Use RPE (current)" : "Use RPE",
+                            systemImage: "gauge.with.dots.needle.67percent")
                     }
                     Button {
                         saveIntensityDisplayForCurrentWorkout(display: "rir")
                     } label: {
-                        Label(exerciseIntensityDisplay == "rir" ? "Use RIR (current)" : "Use RIR", systemImage: "gauge.with.dots.needle.33percent")
+                        Label(
+                            exerciseIntensityDisplay == "rir" ? "Use RIR (current)" : "Use RIR",
+                            systemImage: "gauge.with.dots.needle.33percent")
                     }
                     Divider()
                     Button {
@@ -657,7 +674,8 @@ struct WorkoutEditorView: View {
                 let previousSet = index < previousSets.count ? previousSets[index] : nil
                 SheetSetRow(
                     set: set,
-                    previousText: formatPreviousSet(previousSet, displayWeightUnit: exerciseWeightUnit),
+                    previousText: formatPreviousSet(
+                        previousSet, displayWeightUnit: exerciseWeightUnit),
                     useRPE: exerciseIntensityDisplay == "rpe",
                     weightInLbs: set.weight,
                     displayWeightUnit: exerciseWeightUnit,
@@ -668,15 +686,34 @@ struct WorkoutEditorView: View {
                         let rpe = intensity.map { val in
                             exerciseIntensityDisplay == "rpe" ? val : 10 - val
                         }
+
+                        // Determine post-update values to know if the set should be auto-completed.
+                        let finalWeight = weightLbs ?? set.weight
+                        let finalReps = reps ?? set.reps
+                        let wasCompleted = set.isCompleted ?? false
+                        let shouldComplete = (finalWeight != nil && finalReps != nil)
+
+                        // Only set a rest timer the first time a set becomes completed and has no timer yet.
+                        let restSecondsToSet: Int? =
+                            (shouldComplete && set.restTimerSeconds == nil) ? restTimeSeconds : nil
+
                         do {
                             try workoutStore.updateSet(
                                 setId: set.id,
                                 weight: weightLbs,
                                 reps: reps,
                                 rpe: rpe,
-                                isWarmUp: isWarmUp ?? set.isWarmUp
+                                isWarmUp: isWarmUp ?? set.isWarmUp,
+                                isCompleted: shouldComplete ? true : nil,
+                                restTimerSeconds: restSecondsToSet
                             )
                         } catch {}
+
+                        // Start the rest countdown only when the set transitions from incomplete to complete.
+                        if shouldComplete && !wasCompleted {
+                            onSetCompleted?()
+                        }
+
                         reloadPreservingTitleEdits()
                     },
                     onSetTypeChanged: { newType in
@@ -1166,7 +1203,8 @@ private struct SheetSetRow: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(focusedField == .weight ? Color.accentColor : Color.clear, lineWidth: 2)
+                        .stroke(
+                            focusedField == .weight ? Color.accentColor : Color.clear, lineWidth: 2)
                 )
                 .onSubmit { focusedField = nil }
 
@@ -1180,7 +1218,8 @@ private struct SheetSetRow: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(focusedField == .reps ? Color.accentColor : Color.clear, lineWidth: 2)
+                        .stroke(
+                            focusedField == .reps ? Color.accentColor : Color.clear, lineWidth: 2)
                 )
                 .onSubmit { focusedField = nil }
 
@@ -1194,7 +1233,9 @@ private struct SheetSetRow: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(focusedField == .intensity ? Color.accentColor : Color.clear, lineWidth: 2)
+                        .stroke(
+                            focusedField == .intensity ? Color.accentColor : Color.clear,
+                            lineWidth: 2)
                 )
                 .onSubmit { focusedField = nil }
         }

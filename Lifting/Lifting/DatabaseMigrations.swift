@@ -16,6 +16,8 @@ enum DatabaseMigrations {
             try db.create(table: "exercises", ifNotExists: true) { t in
                 t.column("id", .text).primaryKey()
                 t.column("name", .text).notNull().unique()
+                t.column("equipment", .text).notNull().defaults(to: "machine")
+                t.column("muscle_group", .text).notNull().defaults(to: "back")
             }
 
             try db.create(table: "templates", ifNotExists: true) { t in
@@ -136,6 +138,22 @@ enum DatabaseMigrations {
             if !hasColumn {
                 try db.alter(table: "workout_sets") { t in
                     t.add(column: "is_completed", .integer).defaults(to: 0)
+                }
+            }
+        }
+
+        migrator.registerMigration("v9_add_exercise_categories") { db in
+            let columns = try Row.fetchAll(db, sql: "PRAGMA table_info(exercises)")
+            let hasEquipment = columns.contains { ($0["name"] as String) == "equipment" }
+            let hasMuscleGroup = columns.contains { ($0["name"] as String) == "muscle_group" }
+            if !hasEquipment || !hasMuscleGroup {
+                try db.alter(table: "exercises") { t in
+                    if !hasEquipment {
+                        t.add(column: "equipment", .text).notNull().defaults(to: "machine")
+                    }
+                    if !hasMuscleGroup {
+                        t.add(column: "muscle_group", .text).notNull().defaults(to: "back")
+                    }
                 }
             }
         }

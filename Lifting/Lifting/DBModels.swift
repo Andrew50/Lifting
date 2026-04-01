@@ -39,9 +39,17 @@ struct ExerciseRecord: Codable, FetchableRecord, PersistableRecord, TableRecord,
 
     var id: String
     var name: String
+    var equipment: String
+    var muscleGroup: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, equipment
+        case muscleGroup = "muscle_group"
+    }
 
     enum Columns: String, ColumnExpression {
-        case id, name
+        case id, name, equipment
+        case muscleGroup = "muscle_group"
     }
 }
 

@@ -10,7 +10,7 @@ struct CommonExerciseSearchView: View {
     let onSelect: (ExerciseRecord) -> Void
     var navigationTitle: String = "Exercises"
     var showFrequency: Bool = true
-    
+
     // Balance between fuzzy match and frequency (0.0 to 1.0)
     // 0.0 means ignore frequency, 1.0 means frequency has heavy influence
     var frequencyWeight: Double = 0.2
@@ -36,17 +36,22 @@ struct CommonExerciseSearchView: View {
         return exerciseStore.exercises
             .compactMap { exercise -> (exercise: ExerciseRecord, score: Int)? in
                 let freq = exerciseStore.exerciseFrequencies[exercise.id] ?? 0
-                guard let score = ExerciseSearch.fuzzyScore(
-                    query: query,
-                    candidate: exercise.name,
-                    frequency: freq,
-                    frequencyWeight: frequencyWeight
-                ) else { return nil }
+                let searchableText =
+                    "\(exercise.name) \(exercise.equipment) \(exercise.muscleGroup)"
+                guard
+                    let score = ExerciseSearch.fuzzyScore(
+                        query: query,
+                        candidate: searchableText,
+                        frequency: freq,
+                        frequencyWeight: frequencyWeight
+                    )
+                else { return nil }
                 return (exercise, score)
             }
             .sorted { a, b in
                 if a.score != b.score { return a.score > b.score }
-                return a.exercise.name.localizedCaseInsensitiveCompare(b.exercise.name) == .orderedAscending
+                return a.exercise.name.localizedCaseInsensitiveCompare(b.exercise.name)
+                    == .orderedAscending
             }
             .map(\.exercise)
     }
@@ -54,17 +59,22 @@ struct CommonExerciseSearchView: View {
     var body: some View {
         VStack(spacing: 0) {
             searchBar
-            
+
             List(filteredExercises) { exercise in
                 Button {
                     onSelect(exercise)
                 } label: {
-                    HStack {
-                        Text(exercise.name)
-                            .foregroundStyle(.primary)
-                        
+                    HStack(alignment: .top, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(exercise.name)
+                                .foregroundStyle(.primary)
+                            HStack(spacing: 6) {
+                                categoryChip(text: exercise.equipment.capitalized)
+                                categoryChip(text: exercise.muscleGroup.capitalized)
+                            }
+                        }
                         Spacer()
-                        
+
                         if showFrequency {
                             let count = exerciseStore.exerciseFrequencies[exercise.id] ?? 0
                             if count > 0 {
@@ -90,7 +100,7 @@ struct CommonExerciseSearchView: View {
             await exerciseStore.loadAll()
         }
     }
-    
+
     private var searchBar: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
@@ -118,5 +128,16 @@ struct CommonExerciseSearchView: View {
         .padding(.horizontal, 16)
         .padding(.top, 12)
         .padding(.bottom, 8)
+    }
+
+    private func categoryChip(text: String) -> some View {
+        Text(text)
+            .font(.caption2)
+            .fontWeight(.medium)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Color.secondary.opacity(0.12))
+            .foregroundStyle(.secondary)
+            .clipShape(Capsule())
     }
 }
