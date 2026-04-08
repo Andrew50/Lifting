@@ -194,11 +194,6 @@ private struct CollapsedWorkoutBarView: View {
     @State private var workoutName: String = "Workout"
     @State private var workoutStartedAt: TimeInterval?
 
-    private func formatElapsed(_ startedAt: TimeInterval?) -> String {
-        guard let start = startedAt else { return "0:00" }
-        let total = max(0, Int(Date().timeIntervalSince1970 - start))
-        return String(format: "%d:%02d", total / 60, total % 60)
-    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -211,7 +206,7 @@ private struct CollapsedWorkoutBarView: View {
             Spacer(minLength: 8)
 
             TimelineView(.periodic(from: .now, by: 1.0)) { _ in
-                Text(formatElapsed(workoutStartedAt))
+                Text(TimeInterval.elapsed(since: workoutStartedAt))
                     .font(.subheadline.monospacedDigit())
                     .fontWeight(.medium)
                     .foregroundStyle(.secondary)

@@ -86,7 +86,7 @@ struct WorkoutHistoryBubble: View {
         HistoryBubble {
             HistoryBubbleHeader(
                 title: workout.name,
-                subtitle: "\(workout.completedAt.formatted(.dateTime.month(.defaultDigits).day(.defaultDigits).year(.twoDigits))) \(formatDuration(workout.duration))"
+                subtitle: "\(workout.completedAt.formatted(.dateTime.month(.defaultDigits).day(.defaultDigits).year(.twoDigits))) \(workout.duration.formattedDuration)"
             )
 
             HistoryDivider()
@@ -95,18 +95,6 @@ struct WorkoutHistoryBubble: View {
         }
     }
 
-    private func formatDuration(_ duration: TimeInterval) -> String {
-        let totalSeconds = Int(duration)
-        let hours = totalSeconds / 3600
-        let minutes = (totalSeconds % 3600) / 60
-        let seconds = totalSeconds % 60
-
-        if hours > 0 {
-            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
-        } else {
-            return String(format: "%d:%02d", minutes, seconds)
-        }
-    }
 }
 
 struct HistoryView_Previews: PreviewProvider {

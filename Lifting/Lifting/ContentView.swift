@@ -36,47 +36,11 @@ struct ContentView: View {
     @State private var selectedTab: AppTab = .workout
     @StateObject private var tabReselect = TabReselectCoordinator()
 
-    private var workoutTabIconName: String {
+    private func resolvedIconName(preferred: String, fallback: String) -> String {
         #if canImport(UIKit)
-            if UIImage(systemName: preferredWorkoutTabIconName) != nil {
-                return preferredWorkoutTabIconName
-            }
-            return fallbackWorkoutTabIconName
+            return UIImage(systemName: preferred) != nil ? preferred : fallback
         #else
-            return fallbackWorkoutTabIconName
-        #endif
-    }
-
-    private var historyTabIconName: String {
-        #if canImport(UIKit)
-            if UIImage(systemName: preferredHistoryTabIconName) != nil {
-                return preferredHistoryTabIconName
-            }
-            return fallbackHistoryTabIconName
-        #else
-            return fallbackHistoryTabIconName
-        #endif
-    }
-
-    private var exercisesTabIconName: String {
-        #if canImport(UIKit)
-            if UIImage(systemName: preferredExercisesTabIconName) != nil {
-                return preferredExercisesTabIconName
-            }
-            return fallbackExercisesTabIconName
-        #else
-            return fallbackExercisesTabIconName
-        #endif
-    }
-
-    private var profileTabIconName: String {
-        #if canImport(UIKit)
-            if UIImage(systemName: preferredProfileTabIconName) != nil {
-                return preferredProfileTabIconName
-            }
-            return fallbackProfileTabIconName
-        #else
-            return fallbackProfileTabIconName
+            return fallback
         #endif
     }
 
@@ -89,7 +53,7 @@ struct ContentView: View {
                 authStore: container.authStore
             )
             .tabItem {
-                Label("Workout", systemImage: workoutTabIconName)
+                Label("Workout", systemImage: resolvedIconName(preferred: preferredWorkoutTabIconName, fallback: fallbackWorkoutTabIconName))
             }
             .tag(AppTab.workout)
 
@@ -101,7 +65,7 @@ struct ContentView: View {
                 tabReselect: tabReselect
             )
             .tabItem {
-                Label("History", systemImage: historyTabIconName)
+                Label("History", systemImage: resolvedIconName(preferred: preferredHistoryTabIconName, fallback: fallbackHistoryTabIconName))
             }
             .tag(AppTab.history)
 
@@ -109,7 +73,7 @@ struct ContentView: View {
                 ExerciseListView(container: container)
             }
             .tabItem {
-                Label("Exercises", systemImage: exercisesTabIconName)
+                Label("Exercises", systemImage: resolvedIconName(preferred: preferredExercisesTabIconName, fallback: fallbackExercisesTabIconName))
             }
             .tag(AppTab.exercises)
 
@@ -117,7 +81,7 @@ struct ContentView: View {
                 ProfileView(container: container, authStore: container.authStore)
             }
             .tabItem {
-                Label("Profile", systemImage: profileTabIconName)
+                Label("Profile", systemImage: resolvedIconName(preferred: preferredProfileTabIconName, fallback: fallbackProfileTabIconName))
             }
             .tag(AppTab.profile)
         }

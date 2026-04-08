@@ -34,20 +34,6 @@ struct ActiveWorkoutSheetView: View {
 
     private let restTimeOptions = [30, 45, 60, 90, 120, 180]
 
-    private func formatElapsed(_ startedAt: TimeInterval?) -> String {
-        guard let start = startedAt else { return "0:00" }
-        let end = Date().timeIntervalSince1970
-        let total = max(0, Int(end - start))
-        let min = total / 60
-        let sec = total % 60
-        return String(format: "%d:%02d", min, sec)
-    }
-
-    private func formatCountdown(_ seconds: Int) -> String {
-        let min = seconds / 60
-        let sec = seconds % 60
-        return String(format: "%d:%02d", min, sec)
-    }
 
     private func startRestCountdown() {
         restCountdownRemaining = restTimeSeconds
@@ -96,7 +82,7 @@ struct ActiveWorkoutSheetView: View {
                         Text("Rest")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
-                        Text(formatCountdown(restCountdownRemaining))
+                        Text(restCountdownRemaining.formattedAsMinutesSeconds)
                             .font(.title2.monospacedDigit())
                             .fontWeight(.semibold)
                             .foregroundStyle(restCountdownRemaining <= 10 ? Color.orange : Color.blue)
@@ -107,7 +93,7 @@ struct ActiveWorkoutSheetView: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.8)))
                 } else {
                     TimelineView(.periodic(from: .now, by: 1.0)) { _ in
-                        Text(formatElapsed(workoutStartedAt))
+                        Text(TimeInterval.elapsed(since: workoutStartedAt))
                             .font(.title3.monospacedDigit())
                             .fontWeight(.medium)
                             .foregroundStyle(.secondary)
@@ -263,14 +249,6 @@ struct ActiveWorkoutSheetView: View {
             try workoutStore.discardPendingWorkout(workoutId: workoutId)
         } catch {}
         onDismiss()
-    }
-}
-
-private struct ScaleButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.96 : 1)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: configuration.isPressed)
     }
 }
 

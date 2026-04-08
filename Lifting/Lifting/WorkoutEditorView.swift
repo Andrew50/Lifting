@@ -280,17 +280,11 @@ struct WorkoutEditorView: View {
     private var workoutDurationFormatted: String? {
         guard let total = workoutDurationSeconds else { return nil }
         let min = total / 60
-        let sec = total % 60
-        if min == 0 {
-            return "\(sec)s"
-        }
-        return String(format: "%d:%02d", min, sec)
+        return min == 0 ? "\(total % 60)s" : total.formattedAsMinutesSeconds
     }
 
     private var restTimeFormatted: String {
-        let min = restTimeSeconds / 60
-        let sec = restTimeSeconds % 60
-        return String(format: "%d:%02d", min, sec)
+        restTimeSeconds.formattedAsMinutesSeconds
     }
 
     /// Parse a "M:SS" string into total seconds, returns nil if invalid.
@@ -325,9 +319,7 @@ struct WorkoutEditorView: View {
 
     private func formatRestSeconds(_ seconds: Int?) -> String {
         guard let s = seconds, s > 0 else { return "0:00" }
-        let min = s / 60
-        let sec = s % 60
-        return String(format: "%d:%02d", min, sec)
+        return s.formattedAsMinutesSeconds
     }
 
     @ViewBuilder
@@ -651,13 +643,13 @@ struct WorkoutEditorView: View {
                 Text("Set")
                     .frame(width: 24, alignment: .leading)
                 Text("Previous")
-                    .frame(maxWidth: .infinity)
+                    .frame(width: 80, alignment: .leading)
                 Text(exerciseWeightUnit)
-                    .frame(width: 48, alignment: .center)
+                    .frame(width: 70, alignment: .center)
                 Text("Reps")
-                    .frame(width: 40, alignment: .center)
-                Text(exerciseIntensityDisplay == "rpe" ? "RPE" : "RIR")
-                    .frame(width: 40, alignment: .center)
+                    .frame(width: 60, alignment: .center)
+                Image(systemName: "checkmark.circle")
+                    .frame(width: 32, alignment: .center)
             }
             .font(.system(size: 12))
             .foregroundStyle(.tertiary)
@@ -744,6 +736,28 @@ struct WorkoutEditorView: View {
                             } catch {}
                             reloadPreservingTitleEdits()
                         }
+                    },
+                    onToggleCompleted: { completed in
+                        let wasCompleted = set.isCompleted ?? false
+                        let restSecondsToSet: Int? =
+                            (completed && set.restTimerSeconds == nil) ? restTimeSeconds : nil
+                        do {
+                            try workoutStore.updateSet(
+                                setId: set.id,
+                                weight: nil,
+                                reps: nil,
+                                rpe: nil,
+                                isWarmUp: nil,
+                                isCompleted: completed,
+                                restTimerSeconds: restSecondsToSet
+                            )
+                        } catch {}
+
+                        if completed && !wasCompleted {
+                            onSetCompleted?()
+                        }
+
+                        reloadPreservingTitleEdits()
                     }
                 )
             }
@@ -1103,9 +1117,11 @@ private struct SheetSetRow: View {
     let onSetTypeChanged: (SetType) -> Void
     /// Called when the user swipes to delete this set.
     let onDelete: () -> Void
+    /// Called when the user taps the completion checkmark.
+    let onToggleCompleted: (Bool) -> Void
 
     private enum Field: Hashable {
-        case weight, reps, intensity
+        case weight, reps
     }
 
     /// Display weight (kg or lbs depending on preference).
@@ -1113,15 +1129,8 @@ private struct SheetSetRow: View {
         guard let lbs = weightInLbs else { return nil }
         return displayWeightUnit == "kg" ? lbs / 2.20462 : lbs
     }
-    /// Display intensity (RPE or RIR depending on preference).
-    private var displayIntensity: Double? {
-        guard let rpe = set.rpe else { return nil }
-        return useRPE ? rpe : 10 - rpe
-    }
-
     @State private var weightText: String = ""
     @State private var repsText: String = ""
-    @State private var intensityText: String = ""
     @State private var swipeOffset: CGFloat = 0
     @State private var showDeleteConfirm: Bool = false
     @State private var setType: SetType = .normal
@@ -1140,7 +1149,8 @@ private struct SheetSetRow: View {
     }
 
     private func commit() {
-        onChange(parseDouble(weightText), parseInt(repsText), parseDouble(intensityText), nil)
+        // Intensity/RPE is now handled via the per-set menu; onChange only updates weight/reps.
+        onChange(parseDouble(weightText), parseInt(repsText), nil, nil)
     }
 
     /// The label shown in the set number column.
@@ -1187,18 +1197,18 @@ private struct SheetSetRow: View {
             .frame(width: 24, alignment: .leading)
 
             Text(previousText)
-                .font(.system(size: 15))
+                .font(.system(size: 13))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
-                .frame(maxWidth: .infinity)
+                .frame(width: 80, alignment: .leading)
 
             TextField("", text: $weightText)
                 .focused($focusedField, equals: .weight)
                 .keyboardType(.decimalPad)
                 .multilineTextAlignment(.center)
-                .font(.system(size: 15))
-                .frame(width: 48, height: 32)
+                .font(.system(size: 16, weight: .medium))
+                .frame(width: 70, height: 36)
                 .background(Color(.systemGray6))
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(
@@ -1212,8 +1222,8 @@ private struct SheetSetRow: View {
                 .focused($focusedField, equals: .reps)
                 .keyboardType(.numberPad)
                 .multilineTextAlignment(.center)
-                .font(.system(size: 15))
-                .frame(width: 40, height: 32)
+                .font(.system(size: 16, weight: .medium))
+                .frame(width: 60, height: 36)
                 .background(Color(.systemGray6))
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(
@@ -1223,21 +1233,22 @@ private struct SheetSetRow: View {
                 )
                 .onSubmit { focusedField = nil }
 
-            TextField("", text: $intensityText)
-                .focused($focusedField, equals: .intensity)
-                .keyboardType(.decimalPad)
-                .multilineTextAlignment(.center)
-                .font(.system(size: 15))
-                .frame(width: 40, height: 32)
-                .background(Color(.systemGray6))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(
-                            focusedField == .intensity ? Color.accentColor : Color.clear,
-                            lineWidth: 2)
-                )
-                .onSubmit { focusedField = nil }
+            Button {
+                let current = set.isCompleted ?? false
+                onToggleCompleted(!current)
+            } label: {
+                Image(systemName: (set.isCompleted ?? false) ? "checkmark.circle.fill" : "circle")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 18, height: 18)
+                    .foregroundStyle(
+                        (set.isCompleted ?? false)
+                            ? Color.green
+                            : Color.secondary
+                    )
+                    .frame(width: 32, height: 32)
+            }
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 0)
@@ -1246,23 +1257,23 @@ private struct SheetSetRow: View {
 
     var body: some View {
         ZStack(alignment: .trailing) {
-            // Delete background revealed on swipe
-            Button {
-                onDelete()
-            } label: {
-                Rectangle()
-                    .fill(Color(red: 0.9, green: 0.25, blue: 0.25))
-                    .overlay(
-                        HStack {
-                            Spacer()
+            // Delete background revealed on swipe (only a narrow red strip on the right)
+            HStack(spacing: 0) {
+                Spacer()
+                Button {
+                    onDelete()
+                } label: {
+                    Rectangle()
+                        .fill(Color(red: 0.9, green: 0.25, blue: 0.25))
+                        .overlay(
                             Image(systemName: "trash.fill")
                                 .font(.body)
                                 .foregroundStyle(.white)
-                                .frame(width: 70)
-                        }
-                    )
+                        )
+                        .frame(width: 70)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
 
             // Main row content (spacing and widths must match table header); swipe lives on hosting view so scroll is not blocked
             SetRowWithSwipe(
@@ -1301,7 +1312,6 @@ private struct SheetSetRow: View {
         .onChange(of: useRPE) { _, _ in refreshDisplayFromPreferences() }
         .onChange(of: weightText) { _, _ in commit() }
         .onChange(of: repsText) { _, _ in commit() }
-        .onChange(of: intensityText) { _, _ in commit() }
     }
 
     /// Rounds to nearest tenth for display.
@@ -1317,12 +1327,6 @@ private struct SheetSetRow: View {
             weightText = ""
         }
         repsText = set.reps.map { String($0) } ?? ""
-        if let i = displayIntensity {
-            let r = roundedToTenth(i)
-            intensityText = r == Double(Int(r)) ? String(Int(r)) : String(format: "%.1f", r)
-        } else {
-            intensityText = ""
-        }
     }
 }
 
@@ -1551,12 +1555,5 @@ private struct RestTimerBarView: View {
         .padding(.horizontal, 16)
         .background(Color(UIColor.systemBackground))
         .frame(height: 18)
-    }
-}
-
-private struct ScaleButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.96 : 1)
     }
 }
