@@ -78,128 +78,254 @@ struct ProfileView: View {
         }
     }
 
-    // MARK: - Settings Sections (shared between logged-in and logged-out)
+    // MARK: - Settings Cards (shared between logged-in and logged-out)
 
-    private var settingsSections: some View {
-        Group {
-            Section("Units") {
-                HStack {
-                    Label("Weight", systemImage: "scalemass")
-                    Spacer()
-                    Picker("", selection: $weightUnit) {
-                        ForEach(weightOptions, id: \.self) { unit in
-                            Text(unit).tag(unit)
+    private var settingsCards: some View {
+        VStack(spacing: 20) {
+            // Units section
+            VStack(alignment: .leading, spacing: 8) {
+                Text("UNITS")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(AppTheme.textSecondary)
+                    .tracking(0.5)
+                    .padding(.horizontal, 16)
+
+                VStack(spacing: 0) {
+                    HStack {
+                        Image(systemName: "scalemass")
+                            .foregroundStyle(AppTheme.accent)
+                            .frame(width: 24)
+                        Text("Weight")
+                            .font(.system(size: 16))
+                            .foregroundStyle(AppTheme.textPrimary)
+                        Spacer()
+                        Picker("", selection: $weightUnit) {
+                            ForEach(weightOptions, id: \.self) { unit in
+                                Text(unit).tag(unit)
+                            }
                         }
+                        .pickerStyle(.segmented)
+                        .frame(width: 120)
+                        .tint(AppTheme.accent)
                     }
-                    .pickerStyle(.segmented)
-                    .frame(width: 120)
-                }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
 
-                HStack {
-                    Label("Distance", systemImage: "figure.run")
-                    Spacer()
-                    Picker("", selection: $distanceUnit) {
-                        ForEach(distanceOptions, id: \.self) { unit in
-                            Text(unit).tag(unit)
+                    Divider().overlay(AppTheme.fieldBorder).padding(.horizontal, 16)
+
+                    HStack {
+                        Image(systemName: "figure.run")
+                            .foregroundStyle(AppTheme.accent)
+                            .frame(width: 24)
+                        Text("Distance")
+                            .font(.system(size: 16))
+                            .foregroundStyle(AppTheme.textPrimary)
+                        Spacer()
+                        Picker("", selection: $distanceUnit) {
+                            ForEach(distanceOptions, id: \.self) { unit in
+                                Text(unit).tag(unit)
+                            }
                         }
+                        .pickerStyle(.segmented)
+                        .frame(width: 120)
+                        .tint(AppTheme.accent)
                     }
-                    .pickerStyle(.segmented)
-                    .frame(width: 120)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                 }
+                .background(AppTheme.cardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(AppTheme.cardBorder, lineWidth: 1)
+                )
+                .padding(.horizontal, 16)
             }
 
-            Section("Rest Timer") {
-                Picker(selection: $defaultRestTime) {
-                    ForEach(restTimeOptions, id: \.self) { seconds in
-                        Text(restTimeLabel(seconds)).tag(seconds)
+            // Rest Timer section
+            VStack(alignment: .leading, spacing: 8) {
+                Text("REST TIMER")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(AppTheme.textSecondary)
+                    .tracking(0.5)
+                    .padding(.horizontal, 16)
+
+                VStack(spacing: 0) {
+                    HStack {
+                        Image(systemName: "clock")
+                            .foregroundStyle(AppTheme.accent)
+                            .frame(width: 24)
+                        Text("Default Rest Time")
+                            .font(.system(size: 16))
+                            .foregroundStyle(AppTheme.textPrimary)
+                        Spacer()
+                        Picker("", selection: $defaultRestTime) {
+                            ForEach(restTimeOptions, id: \.self) { seconds in
+                                Text(restTimeLabel(seconds)).tag(seconds)
+                            }
+                        }
+                        .tint(AppTheme.accent)
                     }
-                } label: {
-                    Label("Default Rest Time", systemImage: "clock")
-                }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
 
-                Toggle(isOn: $timerSound) {
-                    Label("Timer Sound", systemImage: "speaker.wave.2")
-                }
+                    Divider().overlay(AppTheme.fieldBorder).padding(.horizontal, 16)
 
-                Toggle(isOn: $timerVibration) {
-                    Label("Vibration", systemImage: "iphone.radiowaves.left.and.right")
+                    HStack {
+                        Image(systemName: "speaker.wave.2")
+                            .foregroundStyle(AppTheme.accent)
+                            .frame(width: 24)
+                        Toggle("Timer Sound", isOn: $timerSound)
+                            .font(.system(size: 16))
+                            .foregroundStyle(AppTheme.textPrimary)
+                            .tint(AppTheme.accent)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+
+                    Divider().overlay(AppTheme.fieldBorder).padding(.horizontal, 16)
+
+                    HStack {
+                        Image(systemName: "iphone.radiowaves.left.and.right")
+                            .foregroundStyle(AppTheme.accent)
+                            .frame(width: 24)
+                        Toggle("Vibration", isOn: $timerVibration)
+                            .font(.system(size: 16))
+                            .foregroundStyle(AppTheme.textPrimary)
+                            .tint(AppTheme.accent)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                 }
+                .background(AppTheme.cardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(AppTheme.cardBorder, lineWidth: 1)
+                )
+                .padding(.horizontal, 16)
             }
 
-            Section("About") {
-                HStack {
-                    Label("Version", systemImage: "info.circle")
-                    Spacer()
-                    Text("1.0.0")
-                        .foregroundStyle(.secondary)
-                }
-            }
+            Text("Version 1.0.0")
+                .font(.system(size: 13))
+                .foregroundStyle(AppTheme.textTertiary)
         }
     }
 
     private func loggedInContent(user: UserRecord) -> some View {
-        List {
-            Section {
+        ScrollView {
+            VStack(spacing: 20) {
+                // Profile card
                 HStack(spacing: 16) {
                     Image(systemName: "person.circle.fill")
                         .font(.system(size: 52))
-                        .foregroundStyle(AuthTheme.primary)
+                        .foregroundStyle(AppTheme.accent)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(user.name)
                             .font(.title3)
                             .fontWeight(.semibold)
+                            .foregroundStyle(AppTheme.textPrimary)
                         Text(user.email)
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(AppTheme.textSecondary)
                     }
                 }
-                .padding(.vertical, 8)
-            }
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(AppTheme.cardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(AppTheme.cardBorder, lineWidth: 1)
+                )
+                .padding(.horizontal, 16)
 
-            Section {
+                // Member since
                 HStack {
-                    Label("Member since", systemImage: "calendar")
+                    Image(systemName: "calendar")
+                        .foregroundStyle(AppTheme.accent)
+                        .frame(width: 24)
+                    Text("Member since")
+                        .font(.system(size: 16))
+                        .foregroundStyle(AppTheme.textPrimary)
                     Spacer()
                     Text(memberSinceFormatted(user.createdAt))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 16))
+                        .foregroundStyle(AppTheme.textSecondary)
                 }
-            }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(AppTheme.cardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(AppTheme.cardBorder, lineWidth: 1)
+                )
+                .padding(.horizontal, 16)
 
-            settingsSections
+                settingsCards
 
-            Section {
+                // Import
                 Button {
                     isFileImporterPresented = true
                 } label: {
                     HStack {
-                        Label("Import Workouts", systemImage: "doc.badge.plus")
+                        Image(systemName: "doc.badge.plus")
+                            .foregroundStyle(AppTheme.accent)
+                            .frame(width: 24)
+                        Text("Import Workouts")
+                            .font(.system(size: 16))
+                            .foregroundStyle(AppTheme.textPrimary)
                         Spacer()
                         if isImporting {
                             ProgressView()
                         }
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                 }
                 .disabled(isImporting)
-            }
-
-            Section {
-                Button(role: .destructive) {
-                    showClearConfirmation = true
-                } label: {
-                    HStack {
-                        Label("Clear All Workout Data", systemImage: "trash")
-                        Spacer()
-                    }
-                }
-            } header: {
-                Text("Danger Zone")
-            } footer: {
-                Text(
-                    "This will permanently delete all your workout history. Your exercise list will be preserved."
+                .background(AppTheme.cardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(AppTheme.cardBorder, lineWidth: 1)
                 )
-            }
+                .padding(.horizontal, 16)
 
-            Section {
+                // Danger zone
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("DANGER ZONE")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(AppTheme.textSecondary)
+                        .tracking(0.5)
+                        .padding(.horizontal, 16)
+
+                    Button(role: .destructive) {
+                        showClearConfirmation = true
+                    } label: {
+                        HStack {
+                            Label("Clear All Workout Data", systemImage: "trash")
+                            Spacer()
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                    }
+                    .background(AppTheme.cardBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(AppTheme.cardBorder, lineWidth: 1)
+                    )
+                    .padding(.horizontal, 16)
+
+                    Text("This will permanently delete all your workout history. Your exercise list will be preserved.")
+                        .font(.system(size: 13))
+                        .foregroundStyle(AppTheme.textTertiary)
+                        .padding(.horizontal, 16)
+                }
+
+                // Log out
                 Button(role: .destructive) {
                     withAnimation {
                         authStore.logOut()
@@ -211,9 +337,20 @@ struct ProfileView: View {
                             .fontWeight(.medium)
                         Spacer()
                     }
+                    .padding(.vertical, 12)
                 }
+                .background(AppTheme.cardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(AppTheme.cardBorder, lineWidth: 1)
+                )
+                .padding(.horizontal, 16)
             }
+            .padding(.top, 8)
+            .padding(.bottom, 20)
         }
+        .background(AppTheme.background)
     }
 
     private func handleFilePicker(result: Result<[URL], Error>) {
@@ -224,7 +361,6 @@ struct ProfileView: View {
 
 
             Task {
-                // Gain access to the file if it's from outside the app sandbox (e.g. iCloud)
                 let accessed = url.startAccessingSecurityScopedResource()
                 defer {
                     if accessed {
@@ -269,35 +405,46 @@ struct ProfileView: View {
     }
 
     private var loggedOutContent: some View {
-        List {
-            Section {
+        ScrollView {
+            VStack(spacing: 20) {
+                // Sign-in card
                 VStack(spacing: 16) {
                     Image(systemName: "person.circle")
-                        .font(.system(size: 52))
-                        .foregroundStyle(AuthTheme.primary.opacity(0.6))
+                        .font(.system(size: 44))
+                        .foregroundStyle(AppTheme.textTertiary)
 
                     Text("Sign in to sync your data across devices.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 15))
+                        .foregroundStyle(AppTheme.textSecondary)
                         .multilineTextAlignment(.center)
 
                     Button {
                         isAuthSheetPresented = true
                     } label: {
                         Text("Log in here")
-                            .font(.headline)
+                            .font(.system(size: 17, weight: .bold))
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)
-                            .background(AuthTheme.primary)
+                            .background(AppTheme.accent)
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
                 }
-                .padding(.vertical, 12)
-            }
+                .padding(20)
+                .background(AppTheme.cardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(AppTheme.cardBorder, lineWidth: 1)
+                )
+                .padding(.horizontal, 16)
 
-            settingsSections
+                settingsCards
+            }
+            .padding(.top, 8)
+            .padding(.bottom, 20)
         }
+        .background(AppTheme.background)
     }
 
     private func memberSinceFormatted(_ timestamp: TimeInterval) -> String {

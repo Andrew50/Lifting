@@ -300,7 +300,7 @@ final class WorkoutStore: ObservableObject {
 
     /// Creates a new pending workout copied from a template. If a pending workout already exists, returns it.
     /// Sets are pre-filled from each exercise's last completed workout when available.
-    func startPendingWorkout(fromTemplate templateId: String) throws -> String {
+    func startPendingWorkout(fromTemplate templateId: String, defaultRestTimerSeconds: Int? = nil) throws -> String {
         if let existing = try fetchPendingWorkoutID() {
             return existing
         }
@@ -356,7 +356,8 @@ final class WorkoutStore: ObservableObject {
                         rpe: nil,
                         rir: prev?.rir,
                         isWarmUp: prev?.isWarmUp,
-                        restTimerSeconds: prev?.restTimerSeconds
+                        isDropSet: prev?.isDropSet,
+                        restTimerSeconds: prev?.restTimerSeconds ?? defaultRestTimerSeconds
                     )
                     try set.insert(db)
                 }
@@ -456,6 +457,7 @@ final class WorkoutStore: ObservableObject {
                         rir: s.rir,
                         rpe: rpe,
                         isWarmUp: s.isWarmUp,
+                        isDropSet: s.isDropSet,
                         isCompleted: s.isCompleted,
                         restTimerSeconds: s.restTimerSeconds
                     )
@@ -473,7 +475,7 @@ final class WorkoutStore: ObservableObject {
     }
 
     /// Adds an exercise to a workout. Creates sets pre-filled from the exercise's last completed workout when available.
-    func addWorkoutExercise(workoutId: String, exerciseId: String) throws {
+    func addWorkoutExercise(workoutId: String, exerciseId: String, defaultRestTimerSeconds: Int? = nil) throws {
         let previousSets = (try fetchLastCompletedSetsByExercise(exerciseIds: [exerciseId]))[exerciseId] ?? []
 
         let now = Date().timeIntervalSince1970
@@ -507,7 +509,8 @@ final class WorkoutStore: ObservableObject {
                     rpe: nil,
                     rir: nil,
                     isWarmUp: nil,
-                    restTimerSeconds: nil
+                    isDropSet: nil,
+                    restTimerSeconds: defaultRestTimerSeconds
                 )
                 try set.insert(db)
             } else {
@@ -524,7 +527,8 @@ final class WorkoutStore: ObservableObject {
                         rpe: nil,
                         rir: prev.rir,
                         isWarmUp: prev.isWarmUp,
-                        restTimerSeconds: prev.restTimerSeconds
+                        isDropSet: prev.isDropSet,
+                        restTimerSeconds: prev.restTimerSeconds ?? defaultRestTimerSeconds
                     )
                     try set.insert(db)
                 }
@@ -537,7 +541,7 @@ final class WorkoutStore: ObservableObject {
         }
     }
 
-    func addSet(workoutExerciseId: String) throws {
+    func addSet(workoutExerciseId: String, restTimerSeconds: Int? = nil) throws {
         try dbQueue.write { db in
             let nextOrder: Int =
                 try Int.fetchOne(
@@ -559,7 +563,8 @@ final class WorkoutStore: ObservableObject {
                 rpe: nil,
                 rir: nil,
                 isWarmUp: nil,
-                restTimerSeconds: nil
+                isDropSet: nil,
+                restTimerSeconds: restTimerSeconds
             )
             try set.insert(db)
         }
@@ -640,6 +645,7 @@ final class WorkoutStore: ObservableObject {
         rir: Double? = nil,
         rpe: Double? = nil,
         isWarmUp: Bool? = nil,
+        isDropSet: Bool? = nil,
         isCompleted: Bool? = nil,
         restTimerSeconds: Int? = nil
     ) throws {
@@ -653,6 +659,7 @@ final class WorkoutStore: ObservableObject {
                     set.rir = 10 - rpe
                 }
                 if let isWarmUp { set.isWarmUp = isWarmUp }
+                if let isDropSet { set.isDropSet = isDropSet }
                 if let isCompleted { set.isCompleted = isCompleted }
                 if let restTimerSeconds { set.restTimerSeconds = restTimerSeconds }
                 try set.update(db)
@@ -693,6 +700,7 @@ final class WorkoutStore: ObservableObject {
                   ws.reps AS reps,
                   ws.rir AS rir,
                   ws.is_warm_up AS isWarmUp,
+                  ws.is_drop_set AS isDropSet,
                   ws.rest_timer_seconds AS restTimerSeconds
                 FROM workout_sets ws
                 JOIN workout_exercises we ON we.id = ws.workout_exercise_id
@@ -704,6 +712,7 @@ final class WorkoutStore: ObservableObject {
                 let startedAt: TimeInterval = row["startedAt"] ?? 0
                 let completedAt: TimeInterval = row["completedAt"] ?? 0
                 let isWarmUp: Bool? = (row["isWarmUp"] as Int?).map { $0 != 0 }
+                let isDropSet: Bool? = (row["isDropSet"] as Int?).map { $0 != 0 }
                 return ExerciseHistorySetEntry(
                     id: row["id"],
                     workoutId: row["workoutId"],
@@ -715,6 +724,7 @@ final class WorkoutStore: ObservableObject {
                     reps: row["reps"],
                     rir: row["rir"],
                     isWarmUp: isWarmUp,
+                    isDropSet: isDropSet,
                     restTimerSeconds: row["restTimerSeconds"]
                 )
             }
@@ -776,7 +786,7 @@ final class WorkoutStore: ObservableObject {
                     JOIN workouts w ON w.id = we.workout_id
                     WHERE we.exercise_id IN (\(placeholders)) AND w.status = 1
                 )
-                SELECT lew.exercise_id, ws.sort_order, ws.weight, ws.reps, ws.is_warm_up, ws.rir, ws.rest_timer_seconds
+                SELECT lew.exercise_id, ws.sort_order, ws.weight, ws.reps, ws.is_warm_up, ws.is_drop_set, ws.rir, ws.rest_timer_seconds
                 FROM LatestExerciseWorkouts lew
                 JOIN workout_sets ws ON ws.workout_exercise_id = lew.workout_exercise_id
                 WHERE lew.rn = 1
@@ -789,11 +799,13 @@ final class WorkoutStore: ObservableObject {
             for row in rows {
                 let exerciseId: String = row["exercise_id"]
                 let isWarmUp: Bool? = (row["is_warm_up"] as Int?).map { $0 != 0 }
+                let isDropSet: Bool? = (row["is_drop_set"] as Int?).map { $0 != 0 }
                 let detail = LastCompletedSetDetail(
                     sortOrder: row["sort_order"] ?? 0,
                     weight: row["weight"],
                     reps: row["reps"],
                     isWarmUp: isWarmUp,
+                    isDropSet: isDropSet,
                     rir: row["rir"],
                     restTimerSeconds: row["rest_timer_seconds"]
                 )

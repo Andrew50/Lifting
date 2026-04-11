@@ -27,30 +27,51 @@ struct HistoryView: View {
     var body: some View {
         NavigationStack(path: $path) {
             ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(spacing: 16) {
-                        Color.clear
-                            .frame(height: 1)
-                            .id(ScrollAnchor.top)
-                            .accessibilityHidden(true)
-
-                        ForEach(historyStore.workouts) { workout in
-                            NavigationLink(value: Route.workout(workout.id)) {
-                                WorkoutHistoryBubble(workout: workout)
-                            }
-                            .buttonStyle(.plain)
+                Group {
+                    if historyStore.workouts.isEmpty {
+                        VStack(spacing: 12) {
+                            Spacer()
+                            Image(systemName: "clock.arrow.circlepath")
+                                .font(.system(size: 44))
+                                .foregroundStyle(AppTheme.textTertiary)
+                            Text("No workouts yet")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(AppTheme.textSecondary)
+                            Text("Complete a workout to see it here")
+                                .font(.system(size: 14))
+                                .foregroundStyle(AppTheme.textTertiary)
+                            Spacer()
                         }
+                        .frame(maxWidth: .infinity)
+                    } else {
+                        ScrollView {
+                            LazyVStack(spacing: 10) {
+                                Color.clear
+                                    .frame(height: 1)
+                                    .id(ScrollAnchor.top)
+                                    .accessibilityHidden(true)
 
-                        if historyStore.canLoadMore {
-                            ProgressView()
-                                .padding()
-                                .onAppear {
-                                    historyStore.loadMore()
+                                ForEach(historyStore.workouts) { workout in
+                                    NavigationLink(value: Route.workout(workout.id)) {
+                                        WorkoutHistoryBubble(workout: workout)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
+
+                                if historyStore.canLoadMore {
+                                    ProgressView()
+                                        .padding()
+                                        .onAppear {
+                                            historyStore.loadMore()
+                                        }
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
                         }
                     }
-                    .padding()
                 }
+                .background(AppTheme.background)
                 .navigationTitle("History")
                 .onChange(of: tabReselect.historyReselectCount) { _, _ in
                     if !path.isEmpty {
@@ -84,10 +105,21 @@ struct WorkoutHistoryBubble: View {
 
     var body: some View {
         HistoryBubble {
-            HistoryBubbleHeader(
-                title: workout.name,
-                subtitle: "\(workout.completedAt.formatted(.dateTime.month(.defaultDigits).day(.defaultDigits).year(.twoDigits))) \(workout.duration.formattedDuration)"
-            )
+            HStack(alignment: .top) {
+                HistoryBubbleHeader(
+                    title: workout.name,
+                    subtitle:
+                        "\(workout.completedAt.formatted(.dateTime.month(.defaultDigits).day(.defaultDigits).year(.twoDigits))) \(workout.duration.formattedDuration)"
+                )
+                Spacer()
+                Text("\(workout.exercises.count) exercises")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(AppTheme.accentText)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(AppTheme.accentLight)
+                    .clipShape(Capsule())
+            }
 
             HistoryDivider()
 
@@ -109,4 +141,3 @@ struct HistoryView_Previews: PreviewProvider {
         )
     }
 }
-

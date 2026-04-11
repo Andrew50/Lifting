@@ -24,7 +24,6 @@ struct CommonExerciseSearchView: View {
     private var filteredExercises: [ExerciseRecord] {
         let query = trimmedQuery
         if query.isEmpty {
-            // If no query, sort by frequency then name
             return exerciseStore.exercises.sorted { a, b in
                 let freqA = exerciseStore.exerciseFrequencies[a.id] ?? 0
                 let freqB = exerciseStore.exerciseFrequencies[b.id] ?? 0
@@ -60,41 +59,60 @@ struct CommonExerciseSearchView: View {
         VStack(spacing: 0) {
             searchBar
 
-            List(filteredExercises) { exercise in
-                Button {
-                    onSelect(exercise)
-                } label: {
-                    HStack(alignment: .top, spacing: 12) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text(exercise.name)
-                                .foregroundStyle(.primary)
-                            HStack(spacing: 6) {
-                                categoryChip(text: exercise.equipment.capitalized)
-                                categoryChip(text: exercise.muscleGroup.capitalized)
-                            }
-                        }
-                        Spacer()
+            ScrollView {
+                LazyVStack(spacing: 0) {
+                    ForEach(Array(filteredExercises.enumerated()), id: \.element.id) { index, exercise in
+                        Button {
+                            onSelect(exercise)
+                        } label: {
+                            HStack(alignment: .top, spacing: 12) {
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(exercise.name)
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundStyle(AppTheme.textPrimary)
+                                    HStack(spacing: 6) {
+                                        categoryChip(text: exercise.equipment.capitalized)
+                                        categoryChip(text: exercise.muscleGroup.capitalized)
+                                    }
+                                }
+                                Spacer()
 
-                        if showFrequency {
-                            let count = exerciseStore.exerciseFrequencies[exercise.id] ?? 0
-                            if count > 0 {
-                                Text("\(count)×")
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Color.accentColor.opacity(0.1))
-                                    .foregroundStyle(Color.accentColor)
-                                    .clipShape(Capsule())
+                                if showFrequency {
+                                    let count = exerciseStore.exerciseFrequencies[exercise.id] ?? 0
+                                    if count > 0 {
+                                        Text("\(count)×")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(AppTheme.accentLight)
+                                            .foregroundStyle(AppTheme.accentText)
+                                            .clipShape(Capsule())
+                                    }
+                                }
                             }
+                            .padding(.vertical, 10)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+
+                        if index < filteredExercises.count - 1 {
+                            Divider()
+                                .overlay(AppTheme.fieldBorder)
                         }
                     }
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .padding(.horizontal, 16)
+                .background(AppTheme.cardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(AppTheme.cardBorder, lineWidth: 1)
+                )
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
             }
-            .listStyle(.plain)
         }
+        .background(AppTheme.background)
         .navigationTitle(navigationTitle)
         .task {
             await exerciseStore.loadAll()
@@ -104,9 +122,10 @@ struct CommonExerciseSearchView: View {
     private var searchBar: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppTheme.textTertiary)
 
             TextField("Search exercises", text: $searchText)
+                .foregroundStyle(AppTheme.textPrimary)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
 
@@ -115,7 +134,7 @@ struct CommonExerciseSearchView: View {
                     searchText = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(AppTheme.textTertiary)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Clear search")
@@ -123,7 +142,7 @@ struct CommonExerciseSearchView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(.thickMaterial)
+        .background(AppTheme.fieldBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .padding(.horizontal, 16)
         .padding(.top, 12)
@@ -132,12 +151,11 @@ struct CommonExerciseSearchView: View {
 
     private func categoryChip(text: String) -> some View {
         Text(text)
-            .font(.caption2)
-            .fontWeight(.medium)
+            .font(.system(size: 11, weight: .semibold))
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
-            .background(Color.secondary.opacity(0.12))
-            .foregroundStyle(.secondary)
-            .clipShape(Capsule())
+            .background(AppTheme.fieldBackground)
+            .foregroundStyle(AppTheme.textSecondary)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 }

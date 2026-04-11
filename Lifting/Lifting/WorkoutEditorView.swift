@@ -8,6 +8,48 @@
 import SwiftUI
 import UIKit
 
+// MARK: - Color hex extension
+
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let r = Double((int >> 16) & 0xFF) / 255
+        let g = Double((int >> 8) & 0xFF) / 255
+        let b = Double(int & 0xFF) / 255
+        self.init(red: r, green: g, blue: b)
+    }
+}
+
+// MARK: - App Theme
+
+enum AppTheme {
+    static let background = Color(hex: "#F8F9FA")
+    static let cardBackground = Color.white
+    static let cardBorder = Color(hex: "#F3F4F6")
+    static let accent = Color(hex: "#059669")
+    static let accentLight = Color(hex: "#D1FAE5")
+    static let accentLighter = Color(hex: "#F0FDF4")
+    static let accentText = Color(hex: "#065F46")
+    static let accentMuted = Color(hex: "#6EE7B7")
+    static let textPrimary = Color(hex: "#111827")
+    static let textSecondary = Color(hex: "#9CA3AF")
+    static let textTertiary = Color(hex: "#D1D5DB")
+    static let fieldBackground = Color(hex: "#F9FAFB")
+    static let fieldBorder = Color(hex: "#F3F4F6")
+    static let cancelBackground = Color(hex: "#FEE2E2")
+    static let cancelText = Color(hex: "#DC2626")
+    static let finishBackground = Color(hex: "#D1FAE5")
+    static let finishText = Color(hex: "#065F46")
+    static let warmupBackground = Color(hex: "#FEF3C7")
+    static let warmupText = Color(hex: "#D97706")
+    static let dropSetBackground = Color(hex: "#EDE9FE")
+    static let dropSetText = Color(hex: "#7C3AED")
+    static let inactiveOpacity = 0.6
+    static let doneOpacity = 0.5
+}
+
 // MARK: - Hosts row content and adds UISwipeGestureRecognizer (does not block ScrollView vertical scrolling)
 private struct SetRowWithSwipe<Content: View>: UIViewRepresentable {
     let content: Content
@@ -44,6 +86,26 @@ private struct SetRowWithSwipe<Content: View>: UIViewRepresentable {
             onSwipeLeft()
         }
     }
+}
+
+private enum SetRowMetrics {
+    static let gap: CGFloat = 6
+    static let midGap: CGFloat = 16
+    static let checkCol: CGFloat = 44
+    /// Wider than `col` for the Previous column.
+    static let previousCol: CGFloat = 88
+    /// Nudges lbs + reps headers and fields right without moving the check column.
+    static let lbsRepsLeadingNudge: CGFloat = 8
+    static var addSetWidth: CGFloat {
+        col + gap + previousCol + midGap + lbsRepsLeadingNudge + col + gap + col
+    }
+    static let horizontalPadding: CGFloat = 16
+
+    // Total row width = 4 * dataCol + 3 * gap (between data cols) + gap + checkCol + 2 * horizontalPadding
+    // On a 390pt wide screen (iPhone 15): 4*76 + 3*6 + 6 + 44 + 32 = 304 + 18 + 6 + 44 + 32 = 404 ❌
+    // Adjust dataCol so it fits: (390 - 32 - 44 - 5*6) / 4 = (390 - 32 - 44 - 30) / 4 = 284 / 4 = 71; use 68 for edge breathing room
+    static let col: CGFloat = 60
+
 }
 
 struct WorkoutEditorView: View {
@@ -254,7 +316,9 @@ struct WorkoutEditorView: View {
 
         case .workout(let workoutId):
             do {
-                try workoutStore.addWorkoutExercise(workoutId: workoutId, exerciseId: exercise.id)
+                try workoutStore.addWorkoutExercise(
+                    workoutId: workoutId, exerciseId: exercise.id,
+                    defaultRestTimerSeconds: restTimeSeconds)
             } catch {}
             reloadPreservingTitleEdits()
         }
@@ -413,52 +477,34 @@ struct WorkoutEditorView: View {
 
     @ViewBuilder
     private func sheetWorkoutContent(workoutId: String) -> some View {
+        let exercisesDone = workoutExercises.filter { ex in
+            !ex.sets.isEmpty && ex.sets.allSatisfy { $0.isCompleted == true }
+        }.count
+        let firstIncompleteExerciseIndex = workoutExercises.firstIndex { ex in
+            ex.sets.contains { $0.isCompleted != true }
+        }
+
         ScrollView {
             VStack(alignment: .leading, spacing: 10) {
-                // Workout overview: title, date & duration inline
-                // TODO: Notes will eventually need to be re-added here (e.g. menu or note entry).
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(alignment: .center) {
                         TextField("", text: $title)
-                            .font(.system(size: 25, weight: .bold))
-                            .foregroundStyle(.primary)
+                            .font(.system(size: 23, weight: .heavy))
+                            .foregroundStyle(AppTheme.textPrimary)
                         Spacer()
                     }
 
-                    HStack(spacing: 12) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "calendar")
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
-                            if let dateTimeStr = workoutStartedAtFormatted {
-                                Text(dateTimeStr)
-                                    .font(.system(size: 15))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        HStack(spacing: 4) {
-                            Image(systemName: "clock")
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
-                            if isPendingWorkout {
-                                TimelineView(.periodic(from: .now, by: 1.0)) { _ in
-                                    Text(workoutDurationFormatted ?? "0:00")
-                                        .font(.system(size: 15))
-                                        .foregroundStyle(.secondary)
-                                }
-                            } else {
-                                Text(workoutDurationFormatted ?? "0:00")
-                                    .font(.system(size: 15))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
+                    if let dateTimeStr = workoutStartedAtFormatted {
+                        Text(
+                            "\(dateTimeStr) · \(exercisesDone) of \(workoutExercises.count) exercises done"
+                        )
+                        .font(.system(size: 12))
+                        .foregroundStyle(AppTheme.textSecondary)
                     }
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 4)
 
-                // Workout notes (shown if not empty)
                 if !workoutNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     HStack(alignment: .top, spacing: 6) {
                         Image(systemName: "note.text")
@@ -481,30 +527,33 @@ struct WorkoutEditorView: View {
                     }
                 }
 
-                // Exercises with table layout (id includes displayPrefsVersion so previous column and headers update when unit/RIR-RPE toggled)
-                ForEach(workoutExercises) { exercise in
-                    sheetExerciseBlock(exercise: exercise, workoutId: workoutId)
-                        .id("\(exercise.id)-\(displayPrefsVersion)")
+                ForEach(Array(workoutExercises.enumerated()), id: \.element.id) { index, exercise in
+                    let completedCount = exercise.sets.filter { $0.isCompleted == true }.count
+                    let isInactive = completedCount == 0 && index != firstIncompleteExerciseIndex
+                    sheetExerciseBlock(
+                        exercise: exercise, workoutId: workoutId, isInactive: isInactive
+                    )
+                    .id("\(exercise.id)-\(displayPrefsVersion)")
                 }
 
-                // Add Exercises button (compact)
                 Button {
                     isShowingExercisePicker = true
                 } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 12))
-                        Text("Add Exercises")
-                            .font(.system(size: 15, weight: .medium))
-                    }
-                    .foregroundStyle(Color.accentColor)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(Color.accentColor.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    Text("Add Exercises")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(AppTheme.accent)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(AppTheme.accentLight.opacity(0.07))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(style: StrokeStyle(lineWidth: 1.5, dash: [6]))
+                                .foregroundStyle(AppTheme.accent.opacity(0.25))
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
                 .buttonStyle(ScaleButtonStyle())
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 12)
                 .padding(.top, 4)
 
                 if isPendingWorkout {
@@ -548,27 +597,67 @@ struct WorkoutEditorView: View {
             }
         }
         .scrollDismissesKeyboard(.interactively)
+        .background(AppTheme.background)
     }
 
-    private func sheetExerciseBlock(exercise: WorkoutExerciseDetail, workoutId: String) -> some View
-    {
+    private func sheetExerciseBlock(
+        exercise: WorkoutExerciseDetail, workoutId: String, isInactive: Bool
+    ) -> some View {
         let exerciseWeightUnit = DisplayPreferences.displayWeightUnit(for: exercise.exerciseId)
         let exerciseIntensityDisplay = DisplayPreferences.displayIntensityDisplay(
             for: exercise.exerciseId)
-        return VStack(alignment: .leading, spacing: 2) {
-            // Exercise name (blue) + icons
-            HStack(spacing: 6) {
-                Button {
-                    selectedExerciseForHistory = ExerciseHistorySelection(
-                        id: exercise.exerciseId, name: exercise.exerciseName)
-                } label: {
-                    Text(exercise.exerciseName)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(Color(red: 0.2, green: 0.4, blue: 1.0))
+        let completedSets = exercise.sets.filter { $0.isCompleted == true }.count
+        let totalSets = exercise.sets.count
+        let muscleGroup =
+            exerciseStore.exercises.first { $0.id == exercise.exerciseId }?.muscleGroup ?? ""
+        let previousSets = previousPerformanceByExerciseId[exercise.exerciseId] ?? []
+
+        let firstIncompleteSetIndex: Int? = {
+            for (i, s) in exercise.sets.enumerated() {
+                if s.isCompleted != true {
+                    let allPreviousCompleted = exercise.sets[0..<i].allSatisfy {
+                        $0.isCompleted == true
+                    }
+                    if allPreviousCompleted { return i }
+                    return nil
                 }
-                .buttonStyle(.plain)
+            }
+            return nil
+        }()
+
+        return VStack(alignment: .leading, spacing: 0) {
+            // Card header
+            HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Button {
+                        selectedExerciseForHistory = ExerciseHistorySelection(
+                            id: exercise.exerciseId, name: exercise.exerciseName)
+                    } label: {
+                        Text(exercise.exerciseName)
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(AppTheme.accent)
+                    }
+                    .buttonStyle(.plain)
+
+                    HStack(spacing: 6) {
+                        if !muscleGroup.isEmpty {
+                            Text(muscleGroup)
+                                .font(.system(size: 11))
+                                .foregroundStyle(AppTheme.textSecondary)
+                        }
+
+                        Text("\(completedSets) / \(totalSets) sets")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(AppTheme.accentText)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(AppTheme.accentLight)
+                            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    }
+                }
 
                 Spacer()
+
                 Menu {
                     Button {
                         isShowingNoteEditor = true
@@ -630,33 +719,73 @@ struct WorkoutEditorView: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 14))
+                        .foregroundStyle(AppTheme.textTertiary)
+                        .frame(width: 32, height: 32)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 2)
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
             .padding(.bottom, 8)
 
-            // Table header (widths and spacing must match SheetSetRow for alignment)
-            HStack(spacing: 6) {
-                Text("Set")
-                    .frame(width: 24, alignment: .leading)
-                Text("Previous")
-                    .frame(width: 80, alignment: .leading)
-                Text(exerciseWeightUnit)
-                    .frame(width: 70, alignment: .center)
-                Text("Reps")
-                    .frame(width: 60, alignment: .center)
-                Image(systemName: "checkmark.circle")
-                    .frame(width: 32, alignment: .center)
+            // Progress bar
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(AppTheme.fieldBorder)
+                        .frame(height: 3)
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(AppTheme.accent)
+                        .frame(
+                            width: geo.size.width * CGFloat(completedSets)
+                                / CGFloat(max(totalSets, 1)),
+                            height: 3
+                        )
+                }
             }
-            .font(.system(size: 12))
-            .foregroundStyle(.tertiary)
-            .padding(.horizontal, 16)
+            .frame(height: 3)
+            .padding(.horizontal, 14)
+            .padding(.bottom, 10)
 
-            // Set rows with rest bars between
-            let previousSets = previousPerformanceByExerciseId[exercise.exerciseId] ?? []
+            // Column header
+            HStack(spacing: 0) {
+                Text("SET")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .textCase(.uppercase)
+                    .multilineTextAlignment(.center)
+                    .frame(width: SetRowMetrics.col)
+
+                Text("PREVIOUS")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .textCase(.uppercase)
+                    .multilineTextAlignment(.center)
+                    .frame(width: SetRowMetrics.previousCol)
+                    .padding(.leading, 16)
+
+                Text(exerciseWeightUnit)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .textCase(.uppercase)
+                    .multilineTextAlignment(.center)
+                    .frame(width: SetRowMetrics.col)
+
+                Text("REPS")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .textCase(.uppercase)
+                    .multilineTextAlignment(.center)
+                    .frame(width: SetRowMetrics.col)
+
+                Spacer(minLength: 0)
+
+                Spacer().frame(width: SetRowMetrics.checkCol)
+            }
+            .padding(.horizontal, 14)
+            .padding(.bottom, 6)
+
+            // Set rows
             ForEach(Array(exercise.sets.enumerated()), id: \.element.id) { index, set in
                 if index > 0 {
                     let setAbove = exercise.sets[index - 1]
@@ -664,6 +793,7 @@ struct WorkoutEditorView: View {
                 }
 
                 let previousSet = index < previousSets.count ? previousSets[index] : nil
+                let isActiveSet = (index == firstIncompleteSetIndex)
                 SheetSetRow(
                     set: set,
                     previousText: formatPreviousSet(
@@ -671,6 +801,7 @@ struct WorkoutEditorView: View {
                     useRPE: exerciseIntensityDisplay == "rpe",
                     weightInLbs: set.weight,
                     displayWeightUnit: exerciseWeightUnit,
+                    isActiveSet: isActiveSet,
                     onChange: { weight, reps, intensity, isWarmUp in
                         let weightLbs = weight.map { w in
                             exerciseWeightUnit == "kg" ? w * 2.20462 : w
@@ -679,15 +810,12 @@ struct WorkoutEditorView: View {
                             exerciseIntensityDisplay == "rpe" ? val : 10 - val
                         }
 
-                        // Determine post-update values to know if the set should be auto-completed.
-                        let finalWeight = weightLbs ?? set.weight
-                        let finalReps = reps ?? set.reps
                         let wasCompleted = set.isCompleted ?? false
-                        let shouldComplete = (finalWeight != nil && finalReps != nil)
+                        let bothFieldsFilled = (weightLbs != nil && reps != nil)
 
-                        // Only set a rest timer the first time a set becomes completed and has no timer yet.
                         let restSecondsToSet: Int? =
-                            (shouldComplete && set.restTimerSeconds == nil) ? restTimeSeconds : nil
+                            (bothFieldsFilled && !wasCompleted && set.restTimerSeconds == nil)
+                            ? restTimeSeconds : nil
 
                         do {
                             try workoutStore.updateSet(
@@ -696,13 +824,12 @@ struct WorkoutEditorView: View {
                                 reps: reps,
                                 rpe: rpe,
                                 isWarmUp: isWarmUp ?? set.isWarmUp,
-                                isCompleted: shouldComplete ? true : nil,
+                                isCompleted: bothFieldsFilled ? true : nil,
                                 restTimerSeconds: restSecondsToSet
                             )
                         } catch {}
 
-                        // Start the rest countdown only when the set transitions from incomplete to complete.
-                        if shouldComplete && !wasCompleted {
+                        if bothFieldsFilled && !wasCompleted {
                             onSetCompleted?()
                         }
 
@@ -714,15 +841,19 @@ struct WorkoutEditorView: View {
                             case .normal:
                                 try workoutStore.updateSet(
                                     setId: set.id, weight: set.weight, reps: set.reps,
-                                    rpe: nil, isWarmUp: false)
+                                    rpe: nil, isWarmUp: false, isDropSet: false)
                             case .warmUp:
                                 try workoutStore.updateSet(
                                     setId: set.id, weight: set.weight, reps: set.reps,
-                                    rpe: set.rpe, isWarmUp: true)
+                                    rpe: set.rpe, isWarmUp: true, isDropSet: false)
+                            case .dropSet:
+                                try workoutStore.updateSet(
+                                    setId: set.id, weight: set.weight, reps: set.reps,
+                                    rpe: set.rpe, isWarmUp: false, isDropSet: true)
                             case .failure:
                                 try workoutStore.updateSet(
                                     setId: set.id, weight: set.weight, reps: set.reps,
-                                    rpe: 10, isWarmUp: false)
+                                    rpe: 10, isWarmUp: false, isDropSet: false)
                             }
                         } catch {}
                         reloadPreservingTitleEdits()
@@ -762,33 +893,45 @@ struct WorkoutEditorView: View {
                 )
             }
 
-            // Add Set
+            // Card footer
             Button {
                 var t = Transaction()
                 t.disablesAnimations = true
                 withTransaction(t) {
                     do {
-                        try workoutStore.addSet(workoutExerciseId: exercise.id)
+                        try workoutStore.addSet(
+                            workoutExerciseId: exercise.id, restTimerSeconds: restTimeSeconds)
                     } catch {}
                     reloadPreservingTitleEdits()
                 }
             } label: {
-                HStack(spacing: 3) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 11))
-                    Text("Add Set (\(restTimeFormatted))")
-                        .font(.system(size: 14, weight: .medium))
-                }
-                .foregroundStyle(Color(.systemGray))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 4)
-                .background(Color(.systemGray6))
-                .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                Text("+ Add Set (\(restTimeFormatted))")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(AppTheme.textSecondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(AppTheme.fieldBackground)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .stroke(style: StrokeStyle(lineWidth: 1.5, dash: [4]))
+                            .foregroundStyle(AppTheme.textTertiary)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             }
             .buttonStyle(ScaleButtonStyle())
-            .padding(.horizontal, 16)
-            .padding(.top, 10)
+            .padding(.horizontal, 14)
+            .padding(.top, 8)
+            .padding(.bottom, 12)
         }
+        .background(AppTheme.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(AppTheme.cardBorder, lineWidth: 1)
+        )
+        .padding(.horizontal, 12)
+        .padding(.bottom, 10)
+        .opacity(isInactive ? AppTheme.inactiveOpacity : 1.0)
     }
 
     var body: some View {
@@ -935,7 +1078,7 @@ struct WorkoutEditorView: View {
                 Button("Start") {
                     do {
                         let workoutId = try workoutStore.startPendingWorkout(
-                            fromTemplate: templateId)
+                            fromTemplate: templateId, defaultRestTimerSeconds: restTimeSeconds)
                         activeWorkoutIdToPush = workoutId
                     } catch {}
                 }
@@ -1093,48 +1236,45 @@ struct WorkoutEditorView: View {
 
 /// Represents the type of a set: normal, warm-up, or failure.
 private enum SetType: CaseIterable {
-    case normal, warmUp, failure
-
-    var next: SetType {
-        switch self {
-        case .normal: return .warmUp
-        case .warmUp: return .failure
-        case .failure: return .normal
-        }
-    }
+    case normal, warmUp, dropSet, failure
 }
 
 private struct SheetSetRow: View {
     let set: WorkoutSetDetail
-    /// Previous performance for this set (e.g. "50 × 10" or "—").
     let previousText: String
     let useRPE: Bool
-    /// Weight in lbs (DB canonical).
     let weightInLbs: Double?
     let displayWeightUnit: String
+    let isActiveSet: Bool
     let onChange: (Double?, Int?, Double?, Bool?) -> Void
-    /// Called when the set type (warm-up / failure) changes.
     let onSetTypeChanged: (SetType) -> Void
-    /// Called when the user swipes to delete this set.
     let onDelete: () -> Void
-    /// Called when the user taps the completion checkmark.
     let onToggleCompleted: (Bool) -> Void
 
     private enum Field: Hashable {
         case weight, reps
     }
 
-    /// Display weight (kg or lbs depending on preference).
     private var displayWeight: Double? {
         guard let lbs = weightInLbs else { return nil }
         return displayWeightUnit == "kg" ? lbs / 2.20462 : lbs
     }
+
     @State private var weightText: String = ""
     @State private var repsText: String = ""
     @State private var swipeOffset: CGFloat = 0
     @State private var showDeleteConfirm: Bool = false
-    @State private var setType: SetType = .normal
+    @State private var localCompleted: Bool = false
     @FocusState private var focusedField: Field?
+
+    private var isCompleted: Bool { localCompleted || (set.isCompleted ?? false) }
+
+    private var setType: SetType {
+        if set.isWarmUp == true { return .warmUp }
+        if set.isDropSet == true { return .dropSet }
+        if set.rpe == 10 { return .failure }
+        return .normal
+    }
 
     private func parseDouble(_ text: String) -> Double? {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1149,133 +1289,220 @@ private struct SheetSetRow: View {
     }
 
     private func commit() {
-        // Intensity/RPE is now handled via the per-set menu; onChange only updates weight/reps.
-        onChange(parseDouble(weightText), parseInt(repsText), nil, nil)
+        let weight = parseDouble(weightText)
+        let reps = parseInt(repsText)
+        if weight != nil && reps != nil {
+            localCompleted = true
+        }
+        onChange(weight, reps, nil, nil)
     }
 
-    /// The label shown in the set number column.
     private var setLabel: String {
         switch setType {
         case .normal: return "\(set.sortOrder + 1)"
         case .warmUp: return "W"
+        case .dropSet: return "D"
         case .failure: return "F"
         }
     }
 
-    /// Color for the set label.
-    private var setLabelColor: Color {
+    private var badgeBackground: Color {
         switch setType {
-        case .normal: return .primary
-        case .warmUp: return Color(red: 0.2, green: 0.72, blue: 0.4)
-        case .failure: return Color(red: 0.9, green: 0.25, blue: 0.25)
+        case .warmUp: return AppTheme.warmupBackground
+        case .dropSet: return AppTheme.dropSetBackground
+        case .failure: return Color.red.opacity(0.15)
+        case .normal:
+            if isActiveSet { return AppTheme.accent }
+            if localCompleted { return AppTheme.accentLight }
+            return AppTheme.fieldBackground
         }
     }
 
-    /// Background color for the set label badge.
-    private var setLabelBackground: Color {
+    private var badgeForeground: Color {
         switch setType {
-        case .normal: return .clear
-        case .warmUp: return Color(red: 0.2, green: 0.72, blue: 0.4).opacity(0.15)
-        case .failure: return Color(red: 0.9, green: 0.25, blue: 0.25).opacity(0.15)
+        case .warmUp: return AppTheme.warmupText
+        case .dropSet: return AppTheme.dropSetText
+        case .failure: return Color.red
+        case .normal:
+            if isActiveSet { return .white }
+            if localCompleted { return AppTheme.accent }
+            return AppTheme.textSecondary
+        }
+    }
+
+    @ViewBuilder
+    private func weightField() -> some View {
+        let height: CGFloat = isActiveSet ? 42 : 36
+        let cornerR: CGFloat = isActiveSet ? 10 : 8
+
+        TextField("", text: $weightText)
+            .focused($focusedField, equals: .weight)
+            .keyboardType(.decimalPad)
+            .multilineTextAlignment(.center)
+            .font(.system(size: isActiveSet ? 20 : 16, weight: .bold))
+            .foregroundStyle(isCompleted ? AppTheme.accent : AppTheme.textPrimary)
+            .frame(width: SetRowMetrics.col, height: height)
+            .background(
+                isCompleted
+                    ? AppTheme.accentLight : isActiveSet ? Color.white : AppTheme.fieldBackground
+            )
+            .clipShape(RoundedRectangle(cornerRadius: cornerR, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerR, style: .continuous)
+                    .stroke(
+                        isCompleted
+                            ? Color.clear
+                            : (focusedField == .weight || isActiveSet)
+                                ? AppTheme.accent : AppTheme.fieldBorder,
+                        lineWidth: isActiveSet ? 2 : 1.5
+                    )
+            )
+            .shadow(
+                color: isActiveSet ? AppTheme.accent.opacity(0.08) : .clear, radius: 0, x: 0, y: 0
+            )
+            .shadow(color: isActiveSet ? AppTheme.accent.opacity(0.08) : .clear, radius: 4)
+            .onSubmit { focusedField = nil }
+    }
+
+    @ViewBuilder
+    private func repsField() -> some View {
+        let height: CGFloat = isActiveSet ? 42 : 36
+        let cornerR: CGFloat = isActiveSet ? 10 : 8
+
+        TextField("", text: $repsText)
+            .focused($focusedField, equals: .reps)
+            .keyboardType(.numberPad)
+            .multilineTextAlignment(.center)
+            .font(.system(size: isActiveSet ? 20 : 16, weight: .bold))
+            .foregroundStyle(isCompleted ? AppTheme.accent : AppTheme.textPrimary)
+            .frame(width: SetRowMetrics.col, height: height)
+            .background(
+                isCompleted
+                    ? AppTheme.accentLight : isActiveSet ? Color.white : AppTheme.fieldBackground
+            )
+            .clipShape(RoundedRectangle(cornerRadius: cornerR, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerR, style: .continuous)
+                    .stroke(
+                        isCompleted
+                            ? Color.clear
+                            : (focusedField == .reps || isActiveSet)
+                                ? AppTheme.accent : AppTheme.fieldBorder,
+                        lineWidth: isActiveSet ? 2 : 1.5
+                    )
+            )
+            .shadow(
+                color: isActiveSet ? AppTheme.accent.opacity(0.08) : .clear, radius: 0, x: 0, y: 0
+            )
+            .shadow(color: isActiveSet ? AppTheme.accent.opacity(0.08) : .clear, radius: 4)
+            .onSubmit { focusedField = nil }
+    }
+
+    @ViewBuilder
+    private var checkmarkButton: some View {
+        Button {
+            let newValue = !isCompleted
+            localCompleted = newValue
+            onToggleCompleted(newValue)
+        } label: {
+            if isCompleted {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 24, height: 24)
+                    .background(AppTheme.accent)
+                    .clipShape(Circle())
+            } else if isActiveSet {
+                Circle()
+                    .stroke(AppTheme.accent, lineWidth: 2)
+                    .frame(width: 30, height: 30)
+            } else {
+                Circle()
+                    .stroke(AppTheme.textTertiary, lineWidth: 1.5)
+                    .frame(width: 24, height: 24)
+            }
+        }
+        .buttonStyle(.plain)
+        .frame(width: SetRowMetrics.checkCol, height: 36)
+    }
+
+    private var rowCells: some View {
+        HStack(spacing: 0) {
+            Menu {
+                Button { onSetTypeChanged(.normal) } label: {
+                    HStack {
+                        Text("Normal")
+                        if setType == .normal { Image(systemName: "checkmark") }
+                    }
+                }
+                Button { onSetTypeChanged(.warmUp) } label: {
+                    HStack {
+                        Text("Warm-up")
+                        if setType == .warmUp { Image(systemName: "checkmark") }
+                    }
+                }
+                Button { onSetTypeChanged(.dropSet) } label: {
+                    HStack {
+                        Text("Drop Set")
+                        if setType == .dropSet { Image(systemName: "checkmark") }
+                    }
+                }
+                Button { onSetTypeChanged(.failure) } label: {
+                    HStack {
+                        Text("Failure")
+                        if setType == .failure { Image(systemName: "checkmark") }
+                    }
+                }
+            } label: {
+                Text(setLabel)
+                    .font(.system(size: 13, weight: .bold))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(badgeForeground)
+                    .frame(width: 26, height: 26)
+                    .background(badgeBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+            .frame(width: SetRowMetrics.col, height: 36, alignment: .center)
+
+            Text(previousText)
+                .font(.system(size: 14, weight: isActiveSet ? .semibold : .medium))
+                .foregroundStyle(isActiveSet ? AppTheme.accentMuted : AppTheme.textTertiary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .multilineTextAlignment(.center)
+                .frame(width: SetRowMetrics.previousCol, height: 36, alignment: .center)
+                .padding(.leading, 16)
+
+            weightField()
+
+            repsField()
+
+            Spacer(minLength: 0)
+
+            checkmarkButton
         }
     }
 
     private var setRowContent: some View {
-        HStack(spacing: 6) {
-            Button {
-                setType = setType.next
-                onSetTypeChanged(setType)
-            } label: {
-                Text(setLabel)
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(setLabelColor)
-                    .frame(width: 20, height: 20)
-                    .background(setLabelBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+        Group {
+            if isActiveSet {
+                ZStack {
+                    AppTheme.accentLighter
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    rowCells
+                        .padding(.horizontal, 8)
+                }
+                .padding(.horizontal, 6)
+            } else {
+                rowCells
+                    .padding(.horizontal, 14)
             }
-            .buttonStyle(.plain)
-            .frame(width: 24, alignment: .leading)
-
-            Text(previousText)
-                .font(.system(size: 13))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .frame(width: 80, alignment: .leading)
-
-            TextField("", text: $weightText)
-                .focused($focusedField, equals: .weight)
-                .keyboardType(.decimalPad)
-                .multilineTextAlignment(.center)
-                .font(.system(size: 16, weight: .medium))
-                .frame(width: 70, height: 36)
-                .background(Color(.systemGray6))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(
-                            focusedField == .weight ? Color.accentColor : Color.clear, lineWidth: 2)
-                )
-                .onSubmit { focusedField = nil }
-
-            TextField("", text: $repsText)
-                .focused($focusedField, equals: .reps)
-                .keyboardType(.numberPad)
-                .multilineTextAlignment(.center)
-                .font(.system(size: 16, weight: .medium))
-                .frame(width: 60, height: 36)
-                .background(Color(.systemGray6))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(
-                            focusedField == .reps ? Color.accentColor : Color.clear, lineWidth: 2)
-                )
-                .onSubmit { focusedField = nil }
-
-            Button {
-                let current = set.isCompleted ?? false
-                onToggleCompleted(!current)
-            } label: {
-                Image(systemName: (set.isCompleted ?? false) ? "checkmark.circle.fill" : "circle")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 18, height: 18)
-                    .foregroundStyle(
-                        (set.isCompleted ?? false)
-                            ? Color.green
-                            : Color.secondary
-                    )
-                    .frame(width: 32, height: 32)
-            }
-            .buttonStyle(.plain)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 0)
-        .background(Color(UIColor.systemBackground))
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     var body: some View {
         ZStack(alignment: .trailing) {
-            // Delete background revealed on swipe (only a narrow red strip on the right)
-            HStack(spacing: 0) {
-                Spacer()
-                Button {
-                    onDelete()
-                } label: {
-                    Rectangle()
-                        .fill(Color(red: 0.9, green: 0.25, blue: 0.25))
-                        .overlay(
-                            Image(systemName: "trash.fill")
-                                .font(.body)
-                                .foregroundStyle(.white)
-                        )
-                        .frame(width: 70)
-                }
-                .buttonStyle(.plain)
-            }
-
-            // Main row content (spacing and widths must match table header); swipe lives on hosting view so scroll is not blocked
             SetRowWithSwipe(
                 content: setRowContent,
                 onSwipeLeft: {
@@ -1297,16 +1524,13 @@ private struct SheetSetRow: View {
             }
         }
         .clipped()
+        .opacity(isCompleted ? AppTheme.doneOpacity : 1.0)
         .onAppear {
+            localCompleted = set.isCompleted ?? false
             refreshDisplayFromPreferences()
-            // Restore set type from model
-            if set.isWarmUp == true {
-                setType = .warmUp
-            } else if set.rpe == 10 {
-                setType = .failure
-            } else {
-                setType = .normal
-            }
+        }
+        .onChange(of: set.isCompleted) { _, newValue in
+            localCompleted = newValue ?? false
         }
         .onChange(of: displayWeightUnit) { _, _ in refreshDisplayFromPreferences() }
         .onChange(of: useRPE) { _, _ in refreshDisplayFromPreferences() }
@@ -1314,7 +1538,6 @@ private struct SheetSetRow: View {
         .onChange(of: repsText) { _, _ in commit() }
     }
 
-    /// Rounds to nearest tenth for display.
     private func roundedToTenth(_ value: Double) -> Double {
         (value * 10).rounded() / 10
     }

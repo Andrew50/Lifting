@@ -43,50 +43,99 @@ struct WorkoutView: View {
     var body: some View {
         VStack(spacing: 0) {
             NavigationStack(path: $path) {
-                List {
-                Section {
-                    Button {
-                        do {
-                            let workoutId = try workoutStore.startOrResumePendingWorkout()
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                                activeWorkoutSheetDetent = .large
-                                activeWorkoutSheetItem = WorkoutSheetItem(workoutId: workoutId)
+                ScrollView {
+                    VStack(spacing: 20) {
+                        Button {
+                            do {
+                                let workoutId = try workoutStore.startOrResumePendingWorkout()
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                                    activeWorkoutSheetDetent = .large
+                                    activeWorkoutSheetItem = WorkoutSheetItem(workoutId: workoutId)
+                                }
+                            } catch {
+                                errorMessage = "Start Workout failed: \(error)"
+                                print(errorMessage ?? "")
                             }
-                        } catch {
-                            errorMessage = "Start Workout failed: \(error)"
-                            print(errorMessage ?? "")
+                        } label: {
+                            Text("Start Workout")
+                                .font(.system(size: 17, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(AppTheme.accent)
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }
-                    } label: {
-                        Text("Start Workout")
-                            .frame(maxWidth: .infinity, alignment: .center)
-                    }
-                    .buttonStyle(BouncyProminentButtonStyle())
-                }
+                        .padding(.horizontal, 16)
 
-                Section("Templates") {
-                    ForEach(templateStore.templates) { template in
-                        NavigationLink(value: Route.template(template.id)) {
-                            Text(template.name)
-                        }
-                    }
-                }
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("TEMPLATES")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(AppTheme.textSecondary)
+                                .tracking(0.5)
+                                .padding(.horizontal, 16)
 
-                Section {
-                    Button {
-                        do {
-                            let templateId = try templateStore.createTemplate(name: "New Template")
-                            path.append(.template(templateId))
-                        } catch {
-                            errorMessage = "Create Template failed: \(error)"
-                            print(errorMessage ?? "")
+                            if !templateStore.templates.isEmpty {
+                                VStack(spacing: 0) {
+                                    ForEach(Array(templateStore.templates.enumerated()), id: \.element.id) { index, template in
+                                        NavigationLink(value: Route.template(template.id)) {
+                                            HStack {
+                                                Text(template.name)
+                                                    .font(.system(size: 16, weight: .semibold))
+                                                    .foregroundStyle(AppTheme.textPrimary)
+                                                Spacer()
+                                                Image(systemName: "chevron.right")
+                                                    .font(.system(size: 14, weight: .semibold))
+                                                    .foregroundStyle(AppTheme.textTertiary)
+                                            }
+                                            .padding(14)
+                                        }
+                                        .buttonStyle(.plain)
+
+                                        if index < templateStore.templates.count - 1 {
+                                            Divider()
+                                                .overlay(AppTheme.fieldBorder)
+                                                .padding(.horizontal, 14)
+                                        }
+                                    }
+                                }
+                                .background(AppTheme.cardBackground)
+                                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .stroke(AppTheme.cardBorder, lineWidth: 1)
+                                )
+                                .padding(.horizontal, 16)
+                            }
+
+                            Button {
+                                do {
+                                    let templateId = try templateStore.createTemplate(name: "New Template")
+                                    path.append(.template(templateId))
+                                } catch {
+                                    errorMessage = "Create Template failed: \(error)"
+                                    print(errorMessage ?? "")
+                                }
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "plus")
+                                    Text("Create Template")
+                                }
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(AppTheme.accent)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .stroke(AppTheme.accent, style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
+                                )
+                            }
+                            .padding(.horizontal, 16)
                         }
-                    } label: {
-                        Label("Create Template", systemImage: "plus")
                     }
-                }
+                    .padding(.top, 8)
+                    .padding(.bottom, 20)
             }
-            .scrollContentBackground(.hidden)
-            .background(Color(UIColor.systemBackground))
+            .background(AppTheme.background)
             .navigationTitle(greetingTitle)
             .navigationDestination(for: Route.self) { route in
                 switch route {
@@ -198,8 +247,8 @@ private struct CollapsedWorkoutBarView: View {
     var body: some View {
         HStack(spacing: 12) {
             Text(workoutName)
-                .font(.subheadline)
-                .fontWeight(.medium)
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(AppTheme.textPrimary)
                 .lineLimit(1)
                 .truncationMode(.tail)
 
@@ -207,15 +256,17 @@ private struct CollapsedWorkoutBarView: View {
 
             TimelineView(.periodic(from: .now, by: 1.0)) { _ in
                 Text(TimeInterval.elapsed(since: workoutStartedAt))
-                    .font(.subheadline.monospacedDigit())
-                    .fontWeight(.medium)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 15, weight: .medium).monospacedDigit())
+                    .foregroundStyle(AppTheme.accent)
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
         .frame(maxWidth: .infinity)
-        .background(Color(UIColor.secondarySystemBackground))
+        .background(AppTheme.cardBackground)
+        .overlay(alignment: .top) {
+            Rectangle().fill(AppTheme.cardBorder).frame(height: 1)
+        }
         .contentShape(Rectangle())
         .onTapGesture(perform: onTap)
         .onAppear {
@@ -232,7 +283,7 @@ private struct BouncyProminentButtonStyle: ButtonStyle {
         configuration.label
             .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
-            .background(Color.accentColor)
+            .background(AppTheme.accent)
             .foregroundStyle(.white)
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .scaleEffect(configuration.isPressed ? 0.97 : 1)

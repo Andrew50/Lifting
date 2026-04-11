@@ -178,6 +178,7 @@ struct WorkoutSetRecord: Codable, FetchableRecord, PersistableRecord, TableRecor
     var rpe: Double?
     var rir: Double?
     var isWarmUp: Bool?
+    var isDropSet: Bool?
     var isCompleted: Bool?
     var restTimerSeconds: Int?
 
@@ -187,6 +188,7 @@ struct WorkoutSetRecord: Codable, FetchableRecord, PersistableRecord, TableRecor
         case sortOrder = "sort_order"
         case weight, reps, distance, seconds, notes, rpe, rir
         case isWarmUp = "is_warm_up"
+        case isDropSet = "is_drop_set"
         case isCompleted = "is_completed"
         case restTimerSeconds = "rest_timer_seconds"
     }
@@ -197,6 +199,7 @@ struct WorkoutSetRecord: Codable, FetchableRecord, PersistableRecord, TableRecor
         case sortOrder = "sort_order"
         case weight, reps, distance, seconds, notes, rpe, rir
         case isWarmUp = "is_warm_up"
+        case isDropSet = "is_drop_set"
         case isCompleted = "is_completed"
         case restTimerSeconds = "rest_timer_seconds"
     }
@@ -239,6 +242,7 @@ struct WorkoutSetDetail: Identifiable, Hashable {
     var rir: Double?
     var rpe: Double?
     var isWarmUp: Bool?
+    var isDropSet: Bool?
     var isCompleted: Bool?
     var restTimerSeconds: Int?
 }
@@ -249,6 +253,7 @@ struct LastCompletedSetDetail: Hashable {
     var weight: Double?
     var reps: Int?
     var isWarmUp: Bool?
+    var isDropSet: Bool?
     var rir: Double?
     var restTimerSeconds: Int?
 }
@@ -265,6 +270,7 @@ struct ExerciseHistorySetEntry: Identifiable, Hashable {
     var reps: Int?
     var rir: Double?
     var isWarmUp: Bool?
+    var isDropSet: Bool?
     var restTimerSeconds: Int?
 }
 

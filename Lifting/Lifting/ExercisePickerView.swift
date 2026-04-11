@@ -22,6 +22,7 @@ struct ExercisePickerView: View {
             },
             navigationTitle: "Add Exercise"
         )
+        .background(AppTheme.background)
         .navigationBarTitleDisplayMode(.inline)
     }
 }

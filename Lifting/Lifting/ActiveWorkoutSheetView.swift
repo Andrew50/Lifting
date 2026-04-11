@@ -3,8 +3,8 @@
 //  Lifting
 //
 
-import SwiftUI
 import Combine
+import SwiftUI
 
 struct ActiveWorkoutSheetView: View {
     @ObservedObject var templateStore: TemplateStore
@@ -33,7 +33,6 @@ struct ActiveWorkoutSheetView: View {
     @State private var restCountdownTimer: AnyCancellable?
 
     private let restTimeOptions = [30, 45, 60, 90, 120, 180]
-
 
     private func startRestCountdown() {
         restCountdownRemaining = restTimeSeconds
@@ -74,72 +73,64 @@ struct ActiveWorkoutSheetView: View {
 
     private var fullContent: some View {
         VStack(spacing: 0) {
-            // Header: clock (left), elapsed timer or countdown (center), Finish (right)
-            ZStack {
-                // Center: elapsed timer or rest countdown
-                if restCountdownActive {
-                    VStack(spacing: 2) {
+            HStack {
+                Button {
+                    showCancelConfirmation = true
+                } label: {
+                    Text("Cancel")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(AppTheme.cancelText)
+                        .padding(.horizontal, 18).padding(.vertical, 9)
+                        .background(AppTheme.cancelBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
+                .buttonStyle(ScaleButtonStyle())
+
+                Spacer()
+
+                VStack(spacing: 1) {
+                    if restCountdownActive {
                         Text("Rest")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(AppTheme.textSecondary)
+                            .textCase(.uppercase)
+                            .tracking(0.5)
                         Text(restCountdownRemaining.formattedAsMinutesSeconds)
-                            .font(.title2.monospacedDigit())
-                            .fontWeight(.semibold)
-                            .foregroundStyle(restCountdownRemaining <= 10 ? Color.orange : Color.blue)
+                            .font(.system(size: 22, weight: .heavy).monospacedDigit())
+                            .foregroundStyle(AppTheme.accent)
+                    } else {
+                        Text("Elapsed")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(AppTheme.textSecondary)
+                            .textCase(.uppercase)
+                            .tracking(0.5)
+                        TimelineView(.periodic(from: .now, by: 1.0)) { _ in
+                            Text(TimeInterval.elapsed(since: workoutStartedAt))
+                                .font(.system(size: 22, weight: .heavy).monospacedDigit())
+                                .foregroundStyle(AppTheme.textPrimary)
+                        }
                     }
-                    .onTapGesture {
-                        stopRestCountdown()
-                    }
-                    .transition(.opacity.combined(with: .scale(scale: 0.8)))
-                } else {
-                    TimelineView(.periodic(from: .now, by: 1.0)) { _ in
-                        Text(TimeInterval.elapsed(since: workoutStartedAt))
-                            .font(.title3.monospacedDigit())
-                            .fontWeight(.medium)
-                            .foregroundStyle(.secondary)
-                    }
-                    .transition(.opacity.combined(with: .scale(scale: 0.8)))
                 }
 
-                HStack {
-                    // Left: Cancel button
-                    Button {
-                        showCancelConfirmation = true
-                    } label: {
-                        Text("Cancel")
-                            .font(.headline)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 12)
-                            .background(Color.red)
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    }
-                    .buttonStyle(ScaleButtonStyle())
+                Spacer()
 
-                    Spacer()
-
-                    // Right: Finish button
-                    Button {
-                        emptySetsCount = (try? workoutStore.countEmptySets(workoutId: workoutId)) ?? 0
-                        showFinishConfirmation = true
-                    } label: {
-                        Text("Finish")
-                            .font(.headline)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 12)
-                            .background(Color.green)
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    }
-                    .buttonStyle(ScaleButtonStyle())
-                    .disabled(isFinishing)
+                Button {
+                    emptySetsCount = (try? workoutStore.countEmptySets(workoutId: workoutId)) ?? 0
+                    showFinishConfirmation = true
+                } label: {
+                    Text("Finish")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(AppTheme.finishText)
+                        .padding(.horizontal, 18).padding(.vertical, 9)
+                        .background(AppTheme.finishBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 }
+                .buttonStyle(ScaleButtonStyle())
+                .disabled(isFinishing)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .background(Color(UIColor.systemBackground))
+            .background(AppTheme.background)
             .animation(.spring(response: 0.3, dampingFraction: 0.7), value: restCountdownActive)
             .alert(
                 "Finish Workout?",
@@ -151,7 +142,9 @@ struct ActiveWorkoutSheetView: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 if emptySetsCount > 0 {
-                    Text("Are you sure you want to finish? \(emptySetsCount) empty \(emptySetsCount == 1 ? "set" : "sets") will be discarded.")
+                    Text(
+                        "Are you sure you want to finish? \(emptySetsCount) empty \(emptySetsCount == 1 ? "set" : "sets") will be discarded."
+                    )
                 } else {
                     Text("Are you sure you want to finish this workout?")
                 }

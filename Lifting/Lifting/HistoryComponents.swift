@@ -16,10 +16,14 @@ struct HistoryBubble<Content: View>: View {
         VStack(alignment: .leading, spacing: 2) {
             content
         }
-        .padding()
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .background(AppTheme.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(AppTheme.cardBorder, lineWidth: 1)
+        )
     }
 }
 
@@ -30,12 +34,13 @@ struct HistoryBubbleHeader: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
-                .font(.body.weight(.bold))
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(AppTheme.textPrimary)
 
             if let subtitle = subtitle {
                 Text(subtitle)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 13))
+                    .foregroundStyle(AppTheme.textSecondary)
             }
         }
     }
@@ -44,7 +49,7 @@ struct HistoryBubbleHeader: View {
 struct HistoryDivider: View {
     var body: some View {
         Rectangle()
-            .fill(Color.secondary.opacity(0.3))
+            .fill(AppTheme.fieldBorder)
             .frame(height: 1)
             .padding(.vertical, 4)
     }
@@ -57,6 +62,7 @@ struct HistorySetRow: View {
     let reps: Int?
     let rir: Double?
     let isWarmUp: Bool?
+    let isDropSet: Bool?
     let restTimerSeconds: Int?
     let displayWeightUnit: String
     let displayIntensityDisplay: String
@@ -79,24 +85,25 @@ struct HistorySetRow: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .center, spacing: 12) {
                 Text("Set \(setNumber)")
-                    .font(.subheadline.monospacedDigit())
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 14).monospacedDigit())
+                    .foregroundStyle(AppTheme.textSecondary)
                     .frame(width: 44, alignment: .leading)
 
                 HStack(spacing: 4) {
                     if let w = displayWeight {
                         let unitSuffix = displayWeightUnit == "kg" ? " kg" : " lbs"
                         Text(String(format: "%.1f", w) + unitSuffix)
-                            .font(.body.monospacedDigit())
+                            .font(.system(size: 14).monospacedDigit())
+                            .foregroundStyle(AppTheme.textPrimary)
                     } else {
                         Text("—")
-                            .foregroundStyle(.tertiary)
+                            .foregroundStyle(AppTheme.textTertiary)
                     }
 
                     if let r = reps {
                         Text("× \(r)")
-                            .font(.body.monospacedDigit())
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 14).monospacedDigit())
+                            .foregroundStyle(AppTheme.textSecondary)
                     }
                 }
 
@@ -118,7 +125,8 @@ struct HistorySetRow: View {
                                 .font(.caption)
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(.blue.opacity(0.1))
+                                .background(AppTheme.accentLight)
+                                .foregroundStyle(AppTheme.accentText)
                                 .clipShape(Capsule())
                         }
                     }
@@ -128,8 +136,18 @@ struct HistorySetRow: View {
                             .font(.caption.weight(.bold))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(.orange.opacity(0.2))
-                            .foregroundStyle(.orange)
+                            .background(AppTheme.warmupBackground)
+                            .foregroundStyle(AppTheme.warmupText)
+                            .clipShape(Circle())
+                    }
+
+                    if isDropSet == true {
+                        Text("D")
+                            .font(.caption.weight(.bold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(AppTheme.dropSetBackground)
+                            .foregroundStyle(AppTheme.dropSetText)
                             .clipShape(Circle())
                     }
                 }
@@ -143,7 +161,7 @@ struct HistorySetRow: View {
                     Text("Rest: \(restSeconds < 60 ? "\(restSeconds)s" : "\(restSeconds / 60):\(String(format: "%02d", restSeconds % 60))")")
                         .font(.caption2)
                 }
-                .foregroundStyle(.secondary)
+                .foregroundStyle(AppTheme.textTertiary)
                 .padding(.leading, 56)
                 .padding(.bottom, 4)
             }
@@ -158,7 +176,8 @@ struct HistoryWorkoutSummaryContent: View {
         VStack(alignment: .leading, spacing: 2) {
             ForEach(exercises) { exercise in
                 Text("\(exercise.setsCount)x \(exercise.name)")
-                    .font(.footnote)
+                    .font(.system(size: 14))
+                    .foregroundStyle(AppTheme.textSecondary)
             }
         }
     }

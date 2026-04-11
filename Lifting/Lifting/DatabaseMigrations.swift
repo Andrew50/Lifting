@@ -158,6 +158,16 @@ enum DatabaseMigrations {
             }
         }
 
+        migrator.registerMigration("v10_add_set_drop_set") { db in
+            let columns = try Row.fetchAll(db, sql: "PRAGMA table_info(workout_sets)")
+            let hasColumn = columns.contains { ($0["name"] as String) == "is_drop_set" }
+            if !hasColumn {
+                try db.alter(table: "workout_sets") { t in
+                    t.add(column: "is_drop_set", .integer)
+                }
+            }
+        }
+
         return migrator
     }()
 }

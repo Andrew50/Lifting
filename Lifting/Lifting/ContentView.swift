@@ -85,6 +85,7 @@ struct ContentView: View {
             }
             .tag(AppTab.profile)
         }
+        .tint(AppTheme.accent)
         .background {
             #if canImport(UIKit)
                 TabBarReselectObserver(coordinator: tabReselect, historyIndex: 1)

@@ -50,11 +50,22 @@ struct ExerciseHistoryView: View {
                     description: Text("There was a problem loading exercise history.")
                 )
             } else if entries.isEmpty {
-                ContentUnavailableView(
-                    "No history yet",
-                    systemImage: "clock.arrow.circlepath",
-                    description: Text("Complete workouts with this exercise to see sets, weights, and dates here.")
-                )
+                VStack(spacing: 12) {
+                    Spacer()
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: 44))
+                        .foregroundStyle(AppTheme.textTertiary)
+                    Text("No history yet")
+                        .font(.system(size: 17, weight: .semibold))
+                        .foregroundStyle(AppTheme.textSecondary)
+                    Text("Complete workouts with this exercise to see sets, weights, and dates here.")
+                        .font(.system(size: 14))
+                        .foregroundStyle(AppTheme.textTertiary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
             } else {
                 ScrollView {
                     LazyVStack(spacing: 16) {
@@ -75,6 +86,7 @@ struct ExerciseHistoryView: View {
                                             reps: set.reps,
                                             rir: set.rir,
                                             isWarmUp: set.isWarmUp,
+                                            isDropSet: set.isDropSet,
                                             restTimerSeconds: set.restTimerSeconds,
                                             displayWeightUnit: DisplayPreferences.displayWeightUnit(for: exerciseId),
                                             displayIntensityDisplay: DisplayPreferences.displayIntensityDisplay(for: exerciseId)
@@ -88,6 +100,7 @@ struct ExerciseHistoryView: View {
                 }
             }
         }
+        .background(AppTheme.background)
         .navigationTitle(exerciseName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -95,6 +108,7 @@ struct ExerciseHistoryView: View {
                 Button("Close") {
                     dismiss()
                 }
+                .foregroundStyle(AppTheme.accent)
             }
         }
         .onAppear {

@@ -250,6 +250,7 @@ final class CSVImporter {
                             rpe: rpe,
                             rir: isFailure ? 0 : nil,
                             isWarmUp: isWarmUp,
+                            isDropSet: nil,
                             restTimerSeconds: nil
                         )
                         try set.insert(db)
