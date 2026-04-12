@@ -129,7 +129,9 @@ enum DatabaseMigrations {
         }
 
         migrator.registerMigration("v7_add_performance_indexes") { db in
-            try db.create(index: "idx_workouts_status_completed_at", on: "workouts", columns: ["status", "completed_at"])
+            try db.create(
+                index: "idx_workouts_status_completed_at", on: "workouts",
+                columns: ["status", "completed_at"])
         }
 
         migrator.registerMigration("v8_add_set_completed") { db in
@@ -192,6 +194,18 @@ enum DatabaseMigrations {
                     t.add(column: "notes", .text)
                 }
             }
+        }
+
+        migrator.registerMigration("v13_fix_exercise_name_casing") { db in
+            try db.execute(
+                sql: """
+                    UPDATE exercises SET name = UPPER(SUBSTR(name,1,1)) || SUBSTR(name,2)
+                    WHERE SUBSTR(name,1,1) = LOWER(SUBSTR(name,1,1))
+                    """)
+            try db.execute(
+                sql: """
+                    UPDATE exercises SET name = 'Band Exercises' WHERE name = 'Band Exercuses'
+                    """)
         }
 
         return migrator

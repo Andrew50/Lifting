@@ -280,10 +280,30 @@ final class HistoryStore: ObservableObject {
 
 @MainActor
 final class WorkoutStore: ObservableObject {
+    @Published private(set) var stats: WorkoutStats = WorkoutStats(streak: 0, thisWeekCount: 0, weeklyVolume: 0)
+
     private let dbQueue: DatabaseQueue
+    private var statsCancellable: AnyCancellable?
 
     init(db: AppDatabase) {
         self.dbQueue = db.dbQueue
+        startObservingStats()
+    }
+
+    private func startObservingStats() {
+        let observation = ValueObservation.tracking { db in
+            let streak = try Self.computeStreak(db: db)
+            let thisWeekCount = try Self.computeThisWeekCount(db: db)
+            let weeklyVolume = try Self.computeWeeklyVolume(db: db)
+            return WorkoutStats(streak: streak, thisWeekCount: thisWeekCount, weeklyVolume: weeklyVolume)
+        }
+        statsCancellable = observation
+            .publisher(in: dbQueue)
+            .receive(on: DispatchQueue.main)
+            .replaceError(with: WorkoutStats(streak: 0, thisWeekCount: 0, weeklyVolume: 0))
+            .sink { [weak self] newStats in
+                self?.stats = newStats
+            }
     }
 
     func fetchPendingWorkoutID() throws -> String? {
@@ -961,13 +981,15 @@ final class BodyWeightStore: ObservableObject {
     }
 
     var weeklyChange: Double? {
-        guard recentEntries.count >= 2 else { return nil }
+        guard recentEntries.count >= 2,
+              let latest = recentEntries.first else { return nil }
         let now = Date()
         let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: now)!
         let weekAgoStr = Self.dateString(from: weekAgo)
-        guard let latest = recentEntries.first else { return nil }
+        // Prefer an entry from ~7 days ago; fall back to the oldest entry we have
         let older = recentEntries.first { $0.date <= weekAgoStr }
-        guard let older else { return nil }
+            ?? recentEntries.last
+        guard let older, older.id != latest.id else { return nil }
         return latest.weight - older.weight
     }
 
@@ -1021,16 +1043,7 @@ struct WorkoutStats {
 }
 
 extension WorkoutStore {
-    func fetchWorkoutStats() throws -> WorkoutStats {
-        try dbQueue.read { db in
-            let streak = try Self.computeStreak(db: db)
-            let thisWeekCount = try Self.computeThisWeekCount(db: db)
-            let weeklyVolume = try Self.computeWeeklyVolume(db: db)
-            return WorkoutStats(streak: streak, thisWeekCount: thisWeekCount, weeklyVolume: weeklyVolume)
-        }
-    }
-
-    private static func computeStreak(db: Database) throws -> Int {
+    private nonisolated static func computeStreak(db: Database) throws -> Int {
         let rows = try Row.fetchAll(db, sql: """
             SELECT DISTINCT date(completed_at, 'unixepoch', 'localtime') as d
             FROM workouts
@@ -1064,7 +1077,7 @@ extension WorkoutStore {
         return streak
     }
 
-    private static func computeThisWeekCount(db: Database) throws -> Int {
+    private nonisolated static func computeThisWeekCount(db: Database) throws -> Int {
         let cal = Calendar.current
         let now = Date()
         let startOfWeek = cal.dateComponents([.calendar, .yearForWeekOfYear, .weekOfYear], from: now).date!
@@ -1075,7 +1088,7 @@ extension WorkoutStore {
             """, arguments: [startEpoch]) ?? 0
     }
 
-    private static func computeWeeklyVolume(db: Database) throws -> Double {
+    private nonisolated static func computeWeeklyVolume(db: Database) throws -> Double {
         let cal = Calendar.current
         let now = Date()
         let startOfWeek = cal.dateComponents([.calendar, .yearForWeekOfYear, .weekOfYear], from: now).date!

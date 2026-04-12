@@ -31,7 +31,6 @@ struct WorkoutView: View {
     @State private var activeWorkoutSheetItem: WorkoutSheetItem?
     @State private var activeWorkoutSheetDetent: PresentationDetent = .large
     @State private var collapsedActiveWorkoutId: String?
-    @State private var stats: WorkoutStats = WorkoutStats(streak: 0, thisWeekCount: 0, weeklyVolume: 0)
     @State private var showWeightLogSheet: Bool = false
     @State private var weightLogText: String = ""
 
@@ -59,15 +58,11 @@ struct WorkoutView: View {
         return "\(Int(volume))"
     }
 
-    private func loadStats() {
-        stats = (try? workoutStore.fetchWorkoutStats()) ?? WorkoutStats(streak: 0, thisWeekCount: 0, weeklyVolume: 0)
-    }
-
     var body: some View {
         VStack(spacing: 0) {
             NavigationStack(path: $path) {
                 ScrollView {
-                    VStack(spacing: 16) {
+                    VStack(spacing: 12) {
                         // Header
                         VStack(alignment: .leading, spacing: 2) {
                             Text(greetingTitle)
@@ -83,9 +78,9 @@ struct WorkoutView: View {
 
                         // Stat cards
                         HStack(spacing: 10) {
-                            StatCard(label: "STREAK", value: "\(stats.streak)", unit: "days")
-                            StatCard(label: "THIS WEEK", value: "\(stats.thisWeekCount)", unit: "workouts")
-                            StatCard(label: "VOLUME", value: formatVolume(stats.weeklyVolume), unit: "lbs lifted")
+                            StatCard(label: "STREAK", value: "\(workoutStore.stats.streak)", unit: "days")
+                            StatCard(label: "THIS WEEK", value: "\(workoutStore.stats.thisWeekCount)", unit: "workouts")
+                            StatCard(label: "VOLUME", value: formatVolume(workoutStore.stats.weeklyVolume), unit: "lbs lifted")
                         }
                         .padding(.horizontal, 16)
 
@@ -258,7 +253,6 @@ struct WorkoutView: View {
                         activeWorkoutSheetItem = nil
                         collapsedActiveWorkoutId = nil
                     }
-                    loadStats()
                 },
                 onCollapseToBar: {
                     if let current = activeWorkoutSheetItem {
@@ -283,7 +277,6 @@ struct WorkoutView: View {
         }
         .onAppear {
             resumePendingWorkoutIfNeeded()
-            loadStats()
         }
     }
 
@@ -305,20 +298,21 @@ private struct StatCard: View {
     let unit: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 1) {
             Text(label)
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(AppTheme.textSecondary)
                 .tracking(0.3)
             Text(value)
-                .font(.system(size: 24, weight: .heavy))
+                .font(.system(size: 22, weight: .heavy))
                 .foregroundStyle(AppTheme.textPrimary)
             Text(unit)
-                .font(.system(size: 11))
+                .font(.system(size: 10))
                 .foregroundStyle(AppTheme.textSecondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
         .background(AppTheme.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
@@ -357,6 +351,10 @@ private struct BodyWeightCard: View {
                                     .font(.system(size: 12, weight: .medium))
                             }
                             .foregroundStyle(change < 0 ? AppTheme.accent : Color(hex: "#DC2626"))
+                        } else if bodyWeightStore.recentEntries.count == 1 {
+                            Text("Log more days to see trend")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(AppTheme.textSecondary)
                         }
                     } else {
                         Text("No data")
@@ -388,12 +386,15 @@ private struct BodyWeightCard: View {
             }
 
             // Mini chart
-            if bodyWeightStore.last7DaysEntries.count >= 2 {
+            if !bodyWeightStore.last7DaysEntries.isEmpty {
+                let entryCount = bodyWeightStore.last7DaysEntries.count
                 BodyWeightChartView(entries: bodyWeightStore.last7DaysEntries)
-                    .frame(height: 80)
+                    .frame(height: entryCount == 1 ? 44 : 80)
             }
         }
-        .padding(14)
+        .padding(.horizontal, 14)
+        .padding(.top, 10)
+        .padding(.bottom, 10)
         .background(AppTheme.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
@@ -409,10 +410,16 @@ private struct BodyWeightChartView: View {
     let entries: [BodyWeightEntryRecord]
 
     private var minWeight: Double {
-        (entries.map(\.weight).min() ?? 0) - 1
+        let lowest = entries.map(\.weight).min() ?? 0
+        let highest = entries.map(\.weight).max() ?? 0
+        if lowest == highest { return lowest - 2 }
+        return lowest - 1
     }
     private var maxWeight: Double {
-        (entries.map(\.weight).max() ?? 0) + 1
+        let lowest = entries.map(\.weight).min() ?? 0
+        let highest = entries.map(\.weight).max() ?? 0
+        if lowest == highest { return highest + 2 }
+        return highest + 1
     }
 
     private func shortDay(_ dateStr: String) -> String {
@@ -429,34 +436,34 @@ private struct BodyWeightChartView: View {
     var body: some View {
         Chart {
             ForEach(entries, id: \.id) { entry in
-                AreaMark(
-                    x: .value("Day", shortDay(entry.date)),
-                    yStart: .value("Min", minWeight),
-                    yEnd: .value("Weight", entry.weight)
-                )
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [AppTheme.accent.opacity(0.15), AppTheme.accent.opacity(0.02)],
-                        startPoint: .top,
-                        endPoint: .bottom
+                if entries.count > 1 {
+                    AreaMark(
+                        x: .value("Day", shortDay(entry.date)),
+                        yStart: .value("Min", minWeight),
+                        yEnd: .value("Weight", entry.weight)
                     )
-                )
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [AppTheme.accent.opacity(0.15), AppTheme.accent.opacity(0.02)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
 
-                LineMark(
-                    x: .value("Day", shortDay(entry.date)),
-                    y: .value("Weight", entry.weight)
-                )
-                .foregroundStyle(AppTheme.accent)
-                .lineStyle(StrokeStyle(lineWidth: 2))
-
-                if entry.id == entries.last?.id {
-                    PointMark(
+                    LineMark(
                         x: .value("Day", shortDay(entry.date)),
                         y: .value("Weight", entry.weight)
                     )
                     .foregroundStyle(AppTheme.accent)
-                    .symbolSize(36)
+                    .lineStyle(StrokeStyle(lineWidth: 2))
                 }
+
+                PointMark(
+                    x: .value("Day", shortDay(entry.date)),
+                    y: .value("Weight", entry.weight)
+                )
+                .foregroundStyle(AppTheme.accent)
+                .symbolSize(entry.id == entries.last?.id ? 48 : 24)
             }
         }
         .chartYScale(domain: minWeight...maxWeight)
