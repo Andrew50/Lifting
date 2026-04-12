@@ -50,7 +50,8 @@ struct ContentView: View {
                 templateStore: container.templateStore,
                 workoutStore: container.workoutStore,
                 exerciseStore: container.exerciseStore,
-                authStore: container.authStore
+                authStore: container.authStore,
+                bodyWeightStore: container.bodyWeightStore
             )
             .tabItem {
                 Label("Workout", systemImage: resolvedIconName(preferred: preferredWorkoutTabIconName, fallback: fallbackWorkoutTabIconName))

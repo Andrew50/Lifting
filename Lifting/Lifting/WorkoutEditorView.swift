@@ -146,10 +146,19 @@ struct WorkoutEditorView: View {
     /// Set id whose rest bar is currently being edited (nil = none).
     @State private var editingRestSetId: String?
     @State private var workoutNotes: String = ""
+    @State private var templateNotes: String = ""
     @State private var isShowingNoteEditor: Bool = false
     @State private var showRestTimePicker: Bool = false
     @State private var replacingExerciseId: String?
     @State private var isShowingReplacePicker: Bool = false
+    @State private var replacingTemplateExerciseId: String?
+    @State private var isShowingTemplateReplacePicker: Bool = false
+    @State private var showDeleteTemplateConfirmation: Bool = false
+
+    /// Tracks whether the user has made any intentional edits (name change, note, exercise add/remove, etc.).
+    /// When false and the user navigates back, the template is discarded as unsaved.
+    var isNewTemplate: Bool = false
+    @State private var userDidEdit: Bool = false
     /// Incremented when display unit/intensity is saved so the sheet (e.g. previous column) re-renders.
     @State private var displayPrefsVersion: Int = 0
     /// For sheet workout: previous set (weight, reps) per exercise, from most recent completed workout.
@@ -173,17 +182,20 @@ struct WorkoutEditorView: View {
                         title = template.name
                     }
                     lastLoadedTitle = template.name
+                    templateNotes = template.notes ?? ""
                 } else {
                     if shouldRefreshTitle {
                         title = "Template"
                     }
                     lastLoadedTitle = "Template"
+                    templateNotes = ""
                 }
                 templateExercises = try templateStore.fetchTemplateExercises(templateId: templateId)
                 isPendingWorkout = false
             } catch {
                 templateExercises = []
                 isPendingWorkout = false
+                templateNotes = ""
             }
 
         case .workout(let workoutId):
@@ -239,6 +251,7 @@ struct WorkoutEditorView: View {
         let userHasEditedTitle = hasLoadedInitialTitle && (title != lastLoadedTitle)
         reload(shouldRefreshTitle: !userHasEditedTitle)
         hasLoadedInitialTitle = true
+        if case .template = subject { userDidEdit = true }
     }
 
     /// Set weight unit for all exercises in the current workout (per-exercise storage) and app-wide default.
@@ -260,8 +273,14 @@ struct WorkoutEditorView: View {
     private func saveAndClose() {
         switch subject {
         case .template(let templateId):
+            userDidEdit = true
             do {
                 try templateStore.updateTemplateName(templateId: templateId, name: title)
+                let trimmedNotes = templateNotes.trimmingCharacters(in: .whitespacesAndNewlines)
+                try templateStore.updateTemplateNotes(
+                    templateId: templateId,
+                    notes: trimmedNotes.isEmpty ? nil : trimmedNotes
+                )
             } catch {}
             onFinish?() ?? dismiss()
 
@@ -438,42 +457,6 @@ struct WorkoutEditorView: View {
         return "—"
     }
 
-    private var listContent: some View {
-        List {
-            Section {
-                TextField("Name", text: $title)
-                    .textInputAutocapitalization(.words)
-                    .autocorrectionDisabled()
-
-                if case .workout = subject, let dateTimeStr = workoutStartedAtFormatted {
-                    Text(dateTimeStr)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-
-                if case .workout = subject, workoutDurationFormatted != nil {
-                    if isPendingWorkout {
-                        TimelineView(.periodic(from: .now, by: 1.0)) { _ in
-                            Text(workoutDurationFormatted ?? "0:00")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                    } else {
-                        Text(workoutDurationFormatted ?? "0:00")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-
-            switch subject {
-            case .template(let templateId):
-                templateSection(templateId: templateId)
-            case .workout(let workoutId):
-                workoutSection(workoutId: workoutId)
-            }
-        }
-    }
 
     @ViewBuilder
     private func sheetWorkoutContent(workoutId: String) -> some View {
@@ -598,6 +581,311 @@ struct WorkoutEditorView: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .background(AppTheme.background)
+    }
+
+    // MARK: - Template card-based content
+
+    @ViewBuilder
+    private func sheetTemplateContent(templateId: String) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .center) {
+                        TextField("Template Name", text: $title)
+                            .font(.system(size: 23, weight: .heavy))
+                            .foregroundStyle(AppTheme.textPrimary)
+                        Spacer()
+                    }
+
+                    Text("\(templateExercises.count) \(templateExercises.count == 1 ? "exercise" : "exercises")")
+                        .font(.system(size: 12))
+                        .foregroundStyle(AppTheme.textSecondary)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+
+                // Notes display
+                if !templateNotes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "note.text")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color(red: 0.4, green: 0.6, blue: 1.0))
+                            .padding(.top, 1)
+                        Text(templateNotes)
+                            .font(.system(size: 15))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(.secondarySystemBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .padding(.horizontal, 16)
+                    .onTapGesture {
+                        isShowingNoteEditor = true
+                    }
+                } else {
+                    Button {
+                        isShowingNoteEditor = true
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "note.text")
+                                .font(.system(size: 12))
+                            Text("Add Note")
+                                .font(.system(size: 14, weight: .medium))
+                        }
+                        .foregroundStyle(AppTheme.textSecondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color(.secondarySystemBackground).opacity(0.5))
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 16)
+                }
+
+                ForEach(templateExercises) { exercise in
+                    sheetTemplateExerciseBlock(exercise: exercise, templateId: templateId)
+                }
+
+                Button {
+                    isShowingExercisePicker = true
+                } label: {
+                    Text("Add Exercises")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(AppTheme.accent)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(AppTheme.accentLight.opacity(0.07))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(style: StrokeStyle(lineWidth: 1.5, dash: [6]))
+                                .foregroundStyle(AppTheme.accent.opacity(0.25))
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .padding(.horizontal, 12)
+                .padding(.top, 4)
+
+                // Start Workout button
+                Button {
+                    do {
+                        let workoutId = try workoutStore.startPendingWorkout(
+                            fromTemplate: templateId, defaultRestTimerSeconds: restTimeSeconds)
+                        activeWorkoutIdToPush = workoutId
+                    } catch {}
+                } label: {
+                    Text("Start Workout")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(AppTheme.accent)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+
+                Button {
+                    showDeleteTemplateConfirmation = true
+                } label: {
+                    Text("Delete Template")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.red.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(ScaleButtonStyle())
+                .padding(.horizontal, 16)
+                .alert("Delete Template?", isPresented: $showDeleteTemplateConfirmation) {
+                    Button("Delete", role: .destructive) {
+                        deleteAndClose()
+                    }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("Are you sure you want to delete this template? This action cannot be undone.")
+                }
+
+                Spacer().frame(height: 16)
+            }
+            .onTapGesture {
+                UIApplication.shared.sendAction(
+                    #selector(UIResponder.resignFirstResponder),
+                    to: nil, from: nil, for: nil)
+            }
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .background(AppTheme.background)
+    }
+
+    private func sheetTemplateExerciseBlock(
+        exercise: TemplateExerciseDetail, templateId: String
+    ) -> some View {
+        let muscleGroup =
+            exerciseStore.exercises.first { $0.id == exercise.exerciseId }?.muscleGroup ?? ""
+
+        return VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 6) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Button {
+                        selectedExerciseForHistory = ExerciseHistorySelection(
+                            id: exercise.exerciseId, name: exercise.exerciseName)
+                    } label: {
+                        Text(exercise.exerciseName)
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(AppTheme.accent)
+                    }
+                    .buttonStyle(.plain)
+
+                    HStack(spacing: 6) {
+                        if !muscleGroup.isEmpty {
+                            Text(muscleGroup)
+                                .font(.system(size: 11))
+                                .foregroundStyle(AppTheme.textSecondary)
+                        }
+
+                        Text("\(exercise.plannedSetsCount) \(exercise.plannedSetsCount == 1 ? "set" : "sets")")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(AppTheme.accentText)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(AppTheme.accentLight)
+                            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    }
+                }
+
+                Spacer()
+
+                Menu {
+                    Button {
+                        replacingTemplateExerciseId = exercise.id
+                        isShowingTemplateReplacePicker = true
+                    } label: {
+                        Label("Replace Exercise", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                    Button(role: .destructive) {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            do {
+                                try templateStore.deleteTemplateExercise(
+                                    templateExerciseId: exercise.id)
+                            } catch {}
+                            reloadPreservingTitleEdits()
+                        }
+                    } label: {
+                        Label("Delete Exercise", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 14))
+                        .foregroundStyle(AppTheme.textTertiary)
+                        .frame(width: 32, height: 32)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 14)
+            .padding(.bottom, 8)
+
+            // Set rows (visual placeholders showing planned set count)
+            HStack(spacing: 0) {
+                Text("SET")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .textCase(.uppercase)
+                    .multilineTextAlignment(.center)
+                    .frame(width: SetRowMetrics.col)
+
+                Spacer()
+            }
+            .padding(.horizontal, 14)
+            .padding(.bottom, 6)
+
+            ForEach(0..<exercise.plannedSetsCount, id: \.self) { index in
+                HStack(spacing: 0) {
+                    Text("\(index + 1)")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(AppTheme.textSecondary)
+                        .frame(width: 26, height: 26)
+                        .background(AppTheme.fieldBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                        .frame(width: SetRowMetrics.col, height: 36)
+
+                    Text("—")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(AppTheme.textTertiary)
+                        .padding(.leading, 16)
+
+                    Spacer()
+                }
+                .padding(.horizontal, 14)
+            }
+
+            // Add / Remove set buttons
+            HStack(spacing: 10) {
+                Button {
+                    let newCount = exercise.plannedSetsCount + 1
+                    do {
+                        try templateStore.updatePlannedSets(
+                            templateExerciseId: exercise.id, plannedSetsCount: newCount)
+                    } catch {}
+                    reloadPreservingTitleEdits()
+                } label: {
+                    Text("+ Add Set")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(AppTheme.textSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(AppTheme.fieldBackground)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .stroke(style: StrokeStyle(lineWidth: 1.5, dash: [4]))
+                                .foregroundStyle(AppTheme.textTertiary)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                }
+                .buttonStyle(ScaleButtonStyle())
+
+                if exercise.plannedSetsCount > 0 {
+                    Button {
+                        let newCount = max(0, exercise.plannedSetsCount - 1)
+                        do {
+                            try templateStore.updatePlannedSets(
+                                templateExerciseId: exercise.id, plannedSetsCount: newCount)
+                        } catch {}
+                        reloadPreservingTitleEdits()
+                    } label: {
+                        Text("- Remove Set")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(AppTheme.textSecondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(AppTheme.fieldBackground)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .stroke(style: StrokeStyle(lineWidth: 1.5, dash: [4]))
+                                    .foregroundStyle(AppTheme.textTertiary)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                    .buttonStyle(ScaleButtonStyle())
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 8)
+            .padding(.bottom, 12)
+        }
+        .background(AppTheme.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(AppTheme.cardBorder, lineWidth: 1)
+        )
+        .padding(.horizontal, 12)
+        .padding(.bottom, 10)
     }
 
     private func sheetExerciseBlock(
@@ -939,29 +1227,19 @@ struct WorkoutEditorView: View {
             switch subject {
             case .workout(let workoutId):
                 sheetWorkoutContent(workoutId: workoutId)
-            case .template:
-                listContent
+            case .template(let templateId):
+                sheetTemplateContent(templateId: templateId)
             }
         }
         .scrollContentBackground(.hidden)
-        .background(Color(UIColor.systemBackground))
-        .navigationTitle(
-            {
-                switch subject {
-                case .workout: return ""
-                case .template: return "Edit"
-                }
-            }()
-        )
+        .background(AppTheme.background)
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if case .template = subject {
-                toolbarItems
-            }
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if case .template = subject {
-                bottomActionBar
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button("Save") { saveAndClose() }
+                }
             }
         }
         .sheet(isPresented: $isShowingExercisePicker) {
@@ -978,9 +1256,22 @@ struct WorkoutEditorView: View {
         }
         .sheet(isPresented: $isShowingNoteEditor) {
             WorkoutNoteEditorSheet(
-                notes: $workoutNotes,
+                notes: {
+                    switch subject {
+                    case .template: return $templateNotes
+                    case .workout: return $workoutNotes
+                    }
+                }(),
                 onSave: {
-                    if case .workout(let workoutId) = subject {
+                    switch subject {
+                    case .template(let templateId):
+                        let trimmed = templateNotes.trimmingCharacters(in: .whitespacesAndNewlines)
+                        try? templateStore.updateTemplateNotes(
+                            templateId: templateId,
+                            notes: trimmed.isEmpty ? nil : trimmed
+                        )
+                        userDidEdit = true
+                    case .workout(let workoutId):
                         try? workoutStore.updateWorkoutNotes(
                             workoutId: workoutId,
                             notes: workoutNotes.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1033,6 +1324,33 @@ struct WorkoutEditorView: View {
                 .navigationBarTitleDisplayMode(.inline)
             }
         }
+        .sheet(isPresented: $isShowingTemplateReplacePicker) {
+            NavigationStack {
+                ExercisePickerView(exerciseStore: exerciseStore) { newExercise in
+                    if let replaceId = replacingTemplateExerciseId {
+                        do {
+                            try templateStore.replaceTemplateExercise(
+                                templateExerciseId: replaceId,
+                                newExerciseId: newExercise.id
+                            )
+                        } catch {}
+                        reloadPreservingTitleEdits()
+                    }
+                    replacingTemplateExerciseId = nil
+                    isShowingTemplateReplacePicker = false
+                }
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") {
+                            replacingTemplateExerciseId = nil
+                            isShowingTemplateReplacePicker = false
+                        }
+                    }
+                }
+                .navigationTitle("Replace Exercise")
+                .navigationBarTitleDisplayMode(.inline)
+            }
+        }
         .navigationDestination(item: $activeWorkoutIdToPush) { workoutId in
             WorkoutEditorView(
                 templateStore: templateStore,
@@ -1047,6 +1365,16 @@ struct WorkoutEditorView: View {
             reload(shouldRefreshTitle: true)
             hasLoadedInitialTitle = true
             restTimeEditText = restTimeFormatted
+        }
+        .onDisappear {
+            if case .template(let templateId) = subject, isNewTemplate, !userDidEdit {
+                try? templateStore.deleteTemplate(templateId: templateId)
+            }
+        }
+        .onChange(of: title) { _, _ in
+            if case .template = subject, hasLoadedInitialTitle, title != lastLoadedTitle {
+                userDidEdit = true
+            }
         }
         .onChange(of: restTimeSeconds) { oldValue, newValue in
             if !isEditingRestTime {
@@ -1064,174 +1392,7 @@ struct WorkoutEditorView: View {
         }
     }
 
-    @ToolbarContentBuilder
-    private var toolbarItems: some ToolbarContent {
-        ToolbarItemGroup(placement: .topBarTrailing) {
-            Button("Save") { saveAndClose() }
-        }
-    }
 
-    @ViewBuilder
-    private var bottomActionBar: some View {
-        if case .template(let templateId) = subject {
-            actionBar {
-                Button("Start") {
-                    do {
-                        let workoutId = try workoutStore.startPendingWorkout(
-                            fromTemplate: templateId, defaultRestTimerSeconds: restTimeSeconds)
-                        activeWorkoutIdToPush = workoutId
-                    } catch {}
-                }
-                .buttonStyle(.borderedProminent)
-
-                Spacer()
-
-                Button("Delete", role: .destructive) { deleteAndClose() }
-                    .buttonStyle(.bordered)
-            }
-        }
-    }
-
-    private func actionBar(@ViewBuilder content: () -> some View) -> some View {
-        VStack(spacing: 0) {
-            Divider()
-            HStack(spacing: 12) {
-                content()
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(.ultraThinMaterial)
-        }
-    }
-
-    @ViewBuilder
-    private func templateSection(templateId: String) -> some View {
-        Section("Exercises") {
-            if templateExercises.isEmpty {
-                Text("No exercises yet.")
-                    .foregroundStyle(.secondary)
-            }
-
-            ForEach(templateExercises) { item in
-                HStack {
-                    Text(item.exerciseName)
-                    Spacer()
-                    Stepper(
-                        value: Binding(
-                            get: { item.plannedSetsCount },
-                            set: { newValue in
-                                let clamped = max(0, newValue)
-                                do {
-                                    try templateStore.updatePlannedSets(
-                                        templateExerciseId: item.id, plannedSetsCount: clamped)
-                                } catch {}
-                                reloadPreservingTitleEdits()
-                            }
-                        ), in: 0...20
-                    ) {
-                        Text("\(item.plannedSetsCount) sets")
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                    Button(role: .destructive) {
-                        do {
-                            try templateStore.deleteTemplateExercise(templateExerciseId: item.id)
-                        } catch {}
-                        reloadPreservingTitleEdits()
-                    } label: {
-                        Label("Delete", systemImage: "trash")
-                    }
-                }
-            }
-        }
-
-        Section {
-            Button {
-                isShowingExercisePicker = true
-            } label: {
-                Label("Add Exercise", systemImage: "plus")
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func workoutSection(workoutId: String) -> some View {
-        if workoutExercises.isEmpty {
-            Section("Exercises") {
-                Text("No exercises yet.")
-                    .foregroundStyle(.secondary)
-            }
-        } else {
-            ForEach(workoutExercises) { exercise in
-                Section {
-                    HStack {
-                        Button {
-                            selectedExerciseForHistory = ExerciseHistorySelection(
-                                id: exercise.exerciseId, name: exercise.exerciseName)
-                        } label: {
-                            Text(exercise.exerciseName)
-                                .font(.headline)
-                        }
-                        .buttonStyle(.plain)
-
-                        Spacer()
-                    }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            do {
-                                try workoutStore.deleteWorkoutExercise(
-                                    workoutExerciseId: exercise.id)
-                            } catch {}
-                            reloadPreservingTitleEdits()
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    }
-
-                    ForEach(exercise.sets) { set in
-                        WorkoutSetRow(
-                            set: set,
-                            onChange: { weight, reps, rir, isWarmUp in
-                                do {
-                                    try workoutStore.updateSet(
-                                        setId: set.id, weight: weight, reps: reps, rir: rir,
-                                        isWarmUp: isWarmUp)
-                                } catch {}
-                            }
-                        )
-                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                            Button(role: .destructive) {
-                                do {
-                                    try workoutStore.deleteSet(setId: set.id)
-                                } catch {}
-                                reloadPreservingTitleEdits()
-                            } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        }
-                    }
-
-                    Button {
-                        do {
-                            try workoutStore.addSet(workoutExerciseId: exercise.id)
-                        } catch {}
-                        reloadPreservingTitleEdits()
-                    } label: {
-                        Label("Add Set", systemImage: "plus")
-                    }
-                }
-            }
-        }
-
-        Section {
-            Button {
-                isShowingExercisePicker = true
-            } label: {
-                Label("Add Exercise", systemImage: "plus")
-            }
-        }
-    }
 }
 
 /// Represents the type of a set: normal, warm-up, or failure.
@@ -1553,67 +1714,6 @@ private struct SheetSetRow: View {
     }
 }
 
-private struct WorkoutSetRow: View {
-    let set: WorkoutSetDetail
-    let onChange: (_ weight: Double?, _ reps: Int?, _ rir: Double?, _ isWarmUp: Bool?) -> Void
-
-    @State private var weightText: String = ""
-    @State private var repsText: String = ""
-    @State private var rirText: String = ""
-    @State private var isWarmUp: Bool = false
-
-    private func parseDouble(_ text: String) -> Double? {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-        return Double(trimmed.replacingOccurrences(of: ",", with: "."))
-    }
-
-    private func parseInt(_ text: String) -> Int? {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }
-        return Int(trimmed)
-    }
-
-    private func commit() {
-        onChange(parseDouble(weightText), parseInt(repsText), parseDouble(rirText), isWarmUp)
-    }
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Text("#\(set.sortOrder + 1)")
-                .font(.footnote.monospacedDigit())
-                .foregroundStyle(.secondary)
-                .frame(width: 28, alignment: .leading)
-
-            TextField("Weight", text: $weightText)
-                .keyboardType(.decimalPad)
-                .textFieldStyle(.roundedBorder)
-
-            TextField("Reps", text: $repsText)
-                .keyboardType(.numberPad)
-                .textFieldStyle(.roundedBorder)
-
-            TextField("RIR", text: $rirText)
-                .keyboardType(.decimalPad)
-                .textFieldStyle(.roundedBorder)
-
-            Toggle("Warm-up", isOn: $isWarmUp)
-                .labelsHidden()
-                .toggleStyle(.button)
-        }
-        .onAppear {
-            weightText = set.weight.map { String($0) } ?? ""
-            repsText = set.reps.map { String($0) } ?? ""
-            rirText = set.rir.map { String($0) } ?? ""
-            isWarmUp = set.isWarmUp ?? false
-        }
-        .onChange(of: weightText) { _, _ in commit() }
-        .onChange(of: repsText) { _, _ in commit() }
-        .onChange(of: rirText) { _, _ in commit() }
-        .onChange(of: isWarmUp) { _, _ in commit() }
-    }
-}
-
 // MARK: - Note Editor Sheet
 
 private struct WorkoutNoteEditorSheet: View {
@@ -1626,7 +1726,7 @@ private struct WorkoutNoteEditorSheet: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 16) {
-                Text("Workout Note")
+                Text("Note")
                     .font(.headline)
                     .padding(.horizontal, 20)
 

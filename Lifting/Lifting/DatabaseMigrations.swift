@@ -168,6 +168,32 @@ enum DatabaseMigrations {
             }
         }
 
+        migrator.registerMigration("v11_add_body_weight_entries") { db in
+            try db.create(table: "body_weight_entries", ifNotExists: true) { t in
+                t.column("id", .text).primaryKey()
+                t.column("weight", .double).notNull()
+                t.column("unit", .text).notNull().defaults(to: "lbs")
+                t.column("date", .text).notNull()
+                t.column("created_at", .double).notNull()
+            }
+            try db.create(
+                index: "idx_body_weight_entries_date",
+                on: "body_weight_entries",
+                columns: ["date"],
+                unique: true
+            )
+        }
+
+        migrator.registerMigration("v12_add_template_notes") { db in
+            let columns = try Row.fetchAll(db, sql: "PRAGMA table_info(templates)")
+            let hasNotes = columns.contains { ($0["name"] as String) == "notes" }
+            if !hasNotes {
+                try db.alter(table: "templates") { t in
+                    t.add(column: "notes", .text)
+                }
+            }
+        }
+
         return migrator
     }()
 }

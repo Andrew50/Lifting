@@ -60,17 +60,18 @@ struct TemplateRecord: Codable, FetchableRecord, PersistableRecord, TableRecord,
 
     var id: String
     var name: String
+    var notes: String?
     var createdAt: TimeInterval
     var updatedAt: TimeInterval
 
     enum CodingKeys: String, CodingKey {
-        case id, name
+        case id, name, notes
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
 
     enum Columns: String, ColumnExpression {
-        case id, name
+        case id, name, notes
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -202,6 +203,28 @@ struct WorkoutSetRecord: Codable, FetchableRecord, PersistableRecord, TableRecor
         case isDropSet = "is_drop_set"
         case isCompleted = "is_completed"
         case restTimerSeconds = "rest_timer_seconds"
+    }
+}
+
+// MARK: - Body Weight
+
+struct BodyWeightEntryRecord: Codable, FetchableRecord, PersistableRecord, TableRecord, Identifiable, Hashable {
+    static let databaseTableName = "body_weight_entries"
+
+    var id: String
+    var weight: Double
+    var unit: String
+    var date: String
+    var createdAt: TimeInterval
+
+    enum CodingKeys: String, CodingKey {
+        case id, weight, unit, date
+        case createdAt = "created_at"
+    }
+
+    enum Columns: String, ColumnExpression {
+        case id, weight, unit, date
+        case createdAt = "created_at"
     }
 }
 

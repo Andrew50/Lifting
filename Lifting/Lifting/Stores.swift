@@ -155,6 +155,37 @@ final class TemplateStore: ObservableObject {
             )
         }
     }
+
+    func updateTemplateNotes(templateId: String, notes: String?) throws {
+        let now = Date().timeIntervalSince1970
+        try dbQueue.write { db in
+            try db.execute(
+                sql: "UPDATE templates SET notes = ?, updated_at = ? WHERE id = ?",
+                arguments: [notes, now, templateId]
+            )
+        }
+    }
+
+    func replaceTemplateExercise(templateExerciseId: String, newExerciseId: String) throws {
+        let now = Date().timeIntervalSince1970
+        try dbQueue.write { db in
+            let templateId: String? = try String.fetchOne(
+                db,
+                sql: "SELECT template_id FROM template_exercises WHERE id = ?",
+                arguments: [templateExerciseId]
+            )
+            try db.execute(
+                sql: "UPDATE template_exercises SET exercise_id = ?, planned_sets_count = 3 WHERE id = ?",
+                arguments: [newExerciseId, templateExerciseId]
+            )
+            if let templateId {
+                try db.execute(
+                    sql: "UPDATE templates SET updated_at = ? WHERE id = ?",
+                    arguments: [now, templateId]
+                )
+            }
+        }
+    }
 }
 
 @MainActor
@@ -892,5 +923,170 @@ final class ExerciseStore: ObservableObject {
             exercises = []
             exerciseFrequencies = [:]
         }
+    }
+}
+
+// MARK: - Body Weight Store
+
+@MainActor
+final class BodyWeightStore: ObservableObject {
+    @Published private(set) var recentEntries: [BodyWeightEntryRecord] = []
+
+    private let dbQueue: DatabaseQueue
+    private var cancellable: AnyCancellable?
+
+    init(db: AppDatabase) {
+        self.dbQueue = db.dbQueue
+        startObserving()
+    }
+
+    private func startObserving() {
+        let observation = ValueObservation.tracking { db in
+            try BodyWeightEntryRecord
+                .order(BodyWeightEntryRecord.Columns.date.desc)
+                .limit(30)
+                .fetchAll(db)
+        }
+        cancellable = observation
+            .publisher(in: dbQueue)
+            .receive(on: DispatchQueue.main)
+            .replaceError(with: [])
+            .sink { [weak self] entries in
+                self?.recentEntries = entries
+            }
+    }
+
+    var latestEntry: BodyWeightEntryRecord? {
+        recentEntries.first
+    }
+
+    var weeklyChange: Double? {
+        guard recentEntries.count >= 2 else { return nil }
+        let now = Date()
+        let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: now)!
+        let weekAgoStr = Self.dateString(from: weekAgo)
+        guard let latest = recentEntries.first else { return nil }
+        let older = recentEntries.first { $0.date <= weekAgoStr }
+        guard let older else { return nil }
+        return latest.weight - older.weight
+    }
+
+    /// Entries for the last 7 days, sorted chronologically (oldest first).
+    var last7DaysEntries: [BodyWeightEntryRecord] {
+        let now = Date()
+        let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: now)!
+        let weekAgoStr = Self.dateString(from: weekAgo)
+        return recentEntries
+            .filter { $0.date >= weekAgoStr }
+            .sorted { $0.date < $1.date }
+    }
+
+    func logWeight(_ weight: Double, unit: String = "lbs", date: Date = Date()) throws {
+        let dateStr = Self.dateString(from: date)
+        let now = Date().timeIntervalSince1970
+        try dbQueue.write { db in
+            let existing = try BodyWeightEntryRecord
+                .filter(BodyWeightEntryRecord.Columns.date == dateStr)
+                .fetchOne(db)
+            if var entry = existing {
+                entry.weight = weight
+                entry.unit = unit
+                try entry.update(db)
+            } else {
+                let entry = BodyWeightEntryRecord(
+                    id: UUID().uuidString,
+                    weight: weight,
+                    unit: unit,
+                    date: dateStr,
+                    createdAt: now
+                )
+                try entry.insert(db)
+            }
+        }
+    }
+
+    static func dateString(from date: Date) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: date)
+    }
+}
+
+// MARK: - Workout Stats
+
+struct WorkoutStats {
+    var streak: Int
+    var thisWeekCount: Int
+    var weeklyVolume: Double
+}
+
+extension WorkoutStore {
+    func fetchWorkoutStats() throws -> WorkoutStats {
+        try dbQueue.read { db in
+            let streak = try Self.computeStreak(db: db)
+            let thisWeekCount = try Self.computeThisWeekCount(db: db)
+            let weeklyVolume = try Self.computeWeeklyVolume(db: db)
+            return WorkoutStats(streak: streak, thisWeekCount: thisWeekCount, weeklyVolume: weeklyVolume)
+        }
+    }
+
+    private static func computeStreak(db: Database) throws -> Int {
+        let rows = try Row.fetchAll(db, sql: """
+            SELECT DISTINCT date(completed_at, 'unixepoch', 'localtime') as d
+            FROM workouts
+            WHERE status = 1 AND completed_at IS NOT NULL
+            ORDER BY d DESC
+            """)
+        let dates = rows.compactMap { $0["d"] as String? }
+        guard !dates.isEmpty else { return 0 }
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let cal = Calendar.current
+
+        var streak = 0
+        var checkDate = cal.startOfDay(for: Date())
+
+        let todayStr = formatter.string(from: checkDate)
+        if dates.first != todayStr {
+            checkDate = cal.date(byAdding: .day, value: -1, to: checkDate)!
+        }
+
+        for dateStr in dates {
+            let expected = formatter.string(from: checkDate)
+            if dateStr == expected {
+                streak += 1
+                checkDate = cal.date(byAdding: .day, value: -1, to: checkDate)!
+            } else if dateStr < expected {
+                break
+            }
+        }
+        return streak
+    }
+
+    private static func computeThisWeekCount(db: Database) throws -> Int {
+        let cal = Calendar.current
+        let now = Date()
+        let startOfWeek = cal.dateComponents([.calendar, .yearForWeekOfYear, .weekOfYear], from: now).date!
+        let startEpoch = startOfWeek.timeIntervalSince1970
+        return try Int.fetchOne(db, sql: """
+            SELECT COUNT(*) FROM workouts
+            WHERE status = 1 AND completed_at >= ?
+            """, arguments: [startEpoch]) ?? 0
+    }
+
+    private static func computeWeeklyVolume(db: Database) throws -> Double {
+        let cal = Calendar.current
+        let now = Date()
+        let startOfWeek = cal.dateComponents([.calendar, .yearForWeekOfYear, .weekOfYear], from: now).date!
+        let startEpoch = startOfWeek.timeIntervalSince1970
+        return try Double.fetchOne(db, sql: """
+            SELECT COALESCE(SUM(ws.weight * ws.reps), 0)
+            FROM workout_sets ws
+            JOIN workout_exercises we ON we.id = ws.workout_exercise_id
+            JOIN workouts w ON w.id = we.workout_id
+            WHERE w.status = 1 AND w.completed_at >= ?
+              AND ws.weight IS NOT NULL AND ws.reps IS NOT NULL
+            """, arguments: [startEpoch]) ?? 0
     }
 }
