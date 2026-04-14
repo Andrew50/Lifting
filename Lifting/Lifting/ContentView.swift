@@ -45,13 +45,27 @@ struct ContentView: View {
     }
 
     var body: some View {
+        Group {
+            if !container.onboardingStore.hasCompletedOnboarding {
+                OnboardingView(store: container.onboardingStore, authStore: container.authStore) {
+                }
+                .transition(.opacity)
+            } else {
+                mainTabView
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: container.onboardingStore.hasCompletedOnboarding)
+    }
+
+    private var mainTabView: some View {
         TabView(selection: $selectedTab) {
             WorkoutView(
                 templateStore: container.templateStore,
                 workoutStore: container.workoutStore,
                 exerciseStore: container.exerciseStore,
                 authStore: container.authStore,
-                bodyWeightStore: container.bodyWeightStore
+                bodyWeightStore: container.bodyWeightStore,
+                onboardingStore: container.onboardingStore
             )
             .tabItem {
                 Label("Workout", systemImage: resolvedIconName(preferred: preferredWorkoutTabIconName, fallback: fallbackWorkoutTabIconName))
@@ -79,7 +93,7 @@ struct ContentView: View {
             .tag(AppTab.exercises)
 
             NavigationStack {
-                ProfileView(container: container, authStore: container.authStore)
+                ProfileView(container: container, authStore: container.authStore, onboardingStore: container.onboardingStore)
             }
             .tabItem {
                 Label("Profile", systemImage: resolvedIconName(preferred: preferredProfileTabIconName, fallback: fallbackProfileTabIconName))

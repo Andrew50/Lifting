@@ -9,6 +9,7 @@ import UniformTypeIdentifiers
 struct ProfileView: View {
     @ObservedObject var container: AppContainer
     @ObservedObject var authStore: AuthStore
+    @ObservedObject var onboardingStore: OnboardingStore
     @State private var isAuthSheetPresented = false
     @State private var isImporting = false
     @State private var importMessage: String?
@@ -82,6 +83,57 @@ struct ProfileView: View {
 
     private var settingsCards: some View {
         VStack(spacing: 20) {
+            // Goal section
+            VStack(alignment: .leading, spacing: 8) {
+                Text("GOAL")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(AppTheme.textSecondary)
+                    .tracking(0.5)
+                    .padding(.horizontal, 16)
+
+                VStack(spacing: 0) {
+                    ForEach(Array(FitnessGoal.allCases.enumerated()), id: \.element.rawValue) { index, goal in
+                        let isSelected = onboardingStore.fitnessGoal == goal
+                        Button {
+                            onboardingStore.fitnessGoal = goal
+                            UserDefaults.standard.set(
+                                goal.rawValue,
+                                forKey: "onboarding.goal"
+                            )
+                        } label: {
+                            HStack {
+                                Image(systemName: goal.icon)
+                                    .foregroundStyle(AppTheme.accent)
+                                    .frame(width: 28)
+                                Text(goal.title)
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(AppTheme.textPrimary)
+                                Spacer()
+                                if isSelected {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(AppTheme.accent)
+                                        .fontWeight(.semibold)
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                        }
+                        .buttonStyle(.plain)
+
+                        if index < FitnessGoal.allCases.count - 1 {
+                            Divider().overlay(AppTheme.fieldBorder).padding(.horizontal, 16)
+                        }
+                    }
+                }
+                .background(AppTheme.cardBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(AppTheme.cardBorder, lineWidth: 1)
+                )
+                .padding(.horizontal, 16)
+            }
+
             // Units section
             VStack(alignment: .leading, spacing: 8) {
                 Text("UNITS")
@@ -457,6 +509,6 @@ struct ProfileView: View {
 #Preview {
     let container = AppContainer()
     return NavigationStack {
-        ProfileView(container: container, authStore: container.authStore)
+        ProfileView(container: container, authStore: container.authStore, onboardingStore: container.onboardingStore)
     }
 }

@@ -228,6 +228,65 @@ struct BodyWeightEntryRecord: Codable, FetchableRecord, PersistableRecord, Table
     }
 }
 
+// MARK: - Personal Records
+
+struct PersonalRecordRecord: Codable, FetchableRecord, PersistableRecord, TableRecord, Identifiable, Hashable {
+    static let databaseTableName = "personal_records"
+
+    var id: String
+    var exerciseId: String
+    var workoutId: String
+    var setId: String
+    var type: String
+    var weight: Double
+    var reps: Int
+    var estimated1RM: Double
+    var previousBest1RM: Double?
+    var improvement: Double?
+    var improvementPercent: Double?
+    var bodyWeight: Double?
+    var achievedAt: TimeInterval
+
+    enum CodingKeys: String, CodingKey {
+        case id, type, weight, reps, improvement
+        case exerciseId = "exercise_id"
+        case workoutId = "workout_id"
+        case setId = "set_id"
+        case estimated1RM = "estimated_1rm"
+        case previousBest1RM = "previous_best_1rm"
+        case improvementPercent = "improvement_percent"
+        case bodyWeight = "body_weight"
+        case achievedAt = "achieved_at"
+    }
+
+    enum Columns {
+        static let id = Column(CodingKeys.id)
+        static let exerciseId = Column(CodingKeys.exerciseId)
+        static let workoutId = Column(CodingKeys.workoutId)
+        static let achievedAt = Column(CodingKeys.achievedAt)
+    }
+}
+
+struct StrengthSnapshotRecord: Codable, FetchableRecord, PersistableRecord, TableRecord, Identifiable, Hashable {
+    static let databaseTableName = "strength_snapshots"
+
+    var id: String
+    var exerciseId: String
+    var workoutId: String
+    var estimatedOneRM: Double
+    var weight: Double
+    var reps: Int
+    var recordedAt: TimeInterval
+
+    enum CodingKeys: String, CodingKey {
+        case id, weight, reps
+        case exerciseId = "exercise_id"
+        case workoutId = "workout_id"
+        case estimatedOneRM = "estimated_1rm"
+        case recordedAt = "recorded_at"
+    }
+}
+
 // MARK: - Convenience types for UI
 
 struct TemplateSummary: Identifiable, Hashable {
@@ -238,8 +297,10 @@ struct TemplateSummary: Identifiable, Hashable {
 struct WorkoutSummary: Identifiable, Hashable {
     var id: String
     var name: String
-    var completedAt: Date
-    var duration: TimeInterval
+    var completedAt: TimeInterval
+    var duration: TimeInterval?
+    var totalVolume: Double
+    var hasPR: Bool
     var exercises: [WorkoutExerciseSummary]
 }
 
@@ -247,6 +308,8 @@ struct WorkoutExerciseSummary: Identifiable, Hashable {
     var id: String
     var name: String
     var setsCount: Int
+    var topWeight: Double?
+    var topReps: Int?
 }
 
 struct TemplateExerciseDetail: Identifiable, Hashable {

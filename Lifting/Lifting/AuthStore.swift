@@ -31,6 +31,7 @@ enum AuthError: LocalizedError {
 @MainActor
 final class AuthStore: ObservableObject {
     @Published private(set) var currentUser: UserRecord?
+    @Published var justSignedUp = false
 
     private let dbQueue: DatabaseQueue
     private static let sessionUserIdKey = "loggedInUserId"
@@ -86,6 +87,7 @@ final class AuthStore: ObservableObject {
         }
 
         currentUser = user
+        justSignedUp = true
         persistSession(userId: user.id)
     }
 
@@ -139,6 +141,7 @@ final class AuthStore: ObservableObject {
         }
         // --- DEV STUB END ---
 
+        justSignedUp = false
         currentUser = user
         persistSession(userId: user.id)
     }

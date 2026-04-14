@@ -173,12 +173,29 @@ struct HistoryWorkoutSummaryContent: View {
     let exercises: [WorkoutExerciseSummary]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: 6) {
             ForEach(exercises) { exercise in
-                Text("\(exercise.setsCount)x \(exercise.name)")
-                    .font(.system(size: 14))
-                    .foregroundStyle(AppTheme.textSecondary)
+                HStack {
+                    Text(exercise.name)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(AppTheme.textPrimary)
+                    Spacer()
+                    Text(exerciseSummaryText(exercise))
+                        .font(.system(size: 12))
+                        .foregroundStyle(AppTheme.textSecondary)
+                }
             }
         }
+    }
+
+    private func exerciseSummaryText(_ exercise: WorkoutExerciseSummary) -> String {
+        let sets = exercise.setsCount
+        if let weight = exercise.topWeight, let reps = exercise.topReps, weight > 0 {
+            let weightStr = weight == Double(Int(weight))
+                ? String(Int(weight))
+                : String(format: "%.1f", weight)
+            return "\(sets) \(sets == 1 ? "set" : "sets") · \(weightStr) × \(reps)"
+        }
+        return "\(sets) \(sets == 1 ? "set" : "sets")"
     }
 }

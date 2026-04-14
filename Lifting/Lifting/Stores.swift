@@ -226,14 +226,25 @@ final class HistoryStore: ObservableObject {
             let workoutIds = records.map { $0.id }
             if workoutIds.isEmpty { return ([WorkoutSummary](), false) }
 
-            // Batch fetch exercise summaries for these workouts
             let placeholders = workoutIds.map { _ in "?" }.joined(separator: ",")
+
             let exercisesSql = """
                 SELECT
                     we.workout_id,
                     we.id,
                     e.name,
-                    (SELECT COUNT(*) FROM workout_sets ws WHERE ws.workout_exercise_id = we.id) as setsCount
+                    (SELECT COUNT(*) FROM workout_sets ws WHERE ws.workout_exercise_id = we.id) as setsCount,
+                    (SELECT ws2.weight FROM workout_sets ws2
+                     WHERE ws2.workout_exercise_id = we.id
+                       AND ws2.weight IS NOT NULL
+                     ORDER BY ws2.weight DESC LIMIT 1) as topWeight,
+                    (SELECT ws3.reps FROM workout_sets ws3
+                     WHERE ws3.workout_exercise_id = we.id
+                       AND ws3.weight = (
+                           SELECT MAX(ws4.weight) FROM workout_sets ws4
+                           WHERE ws4.workout_exercise_id = we.id
+                       )
+                     ORDER BY ws3.reps DESC LIMIT 1) as topReps
                 FROM workout_exercises we
                 JOIN exercises e ON e.id = we.exercise_id
                 WHERE we.workout_id IN (\(placeholders))
@@ -243,6 +254,31 @@ final class HistoryStore: ObservableObject {
                 db, sql: exercisesSql, arguments: StatementArguments(workoutIds))
             let exercisesByWorkoutId = Dictionary(grouping: allExercises, by: { $0["workout_id"] as String })
 
+            let volumeSql = """
+                SELECT we.workout_id,
+                       COALESCE(SUM(ws.weight * ws.reps), 0) as volume
+                FROM workout_sets ws
+                JOIN workout_exercises we ON we.id = ws.workout_exercise_id
+                WHERE we.workout_id IN (\(placeholders))
+                  AND ws.weight IS NOT NULL AND ws.reps IS NOT NULL
+                GROUP BY we.workout_id
+                """
+            let volumeRows = try Row.fetchAll(db, sql: volumeSql, arguments: StatementArguments(workoutIds))
+            var volumeByWorkoutId: [String: Double] = [:]
+            for row in volumeRows {
+                let wid: String = row["workout_id"]
+                let vol: Double = row["volume"]
+                volumeByWorkoutId[wid] = vol
+            }
+
+            let prSql = """
+                SELECT DISTINCT workout_id
+                FROM personal_records
+                WHERE workout_id IN (\(placeholders))
+                """
+            let prRows = try Row.fetchAll(db, sql: prSql, arguments: StatementArguments(workoutIds))
+            let workoutIdsWithPR = Set(prRows.compactMap { $0["workout_id"] as String? })
+
             let summaries = records.compactMap { workout -> WorkoutSummary? in
                 guard let completedAt = workout.completedAt else { return nil }
 
@@ -250,15 +286,19 @@ final class HistoryStore: ObservableObject {
                     WorkoutExerciseSummary(
                         id: row["id"],
                         name: row["name"],
-                        setsCount: row["setsCount"]
+                        setsCount: row["setsCount"],
+                        topWeight: row["topWeight"] as Double?,
+                        topReps: row["topReps"] as Int?
                     )
                 }
 
                 return WorkoutSummary(
                     id: workout.id,
                     name: workout.name,
-                    completedAt: Date(timeIntervalSince1970: completedAt),
+                    completedAt: completedAt,
                     duration: completedAt - workout.startedAt,
+                    totalVolume: volumeByWorkoutId[workout.id] ?? 0,
+                    hasPR: workoutIdsWithPR.contains(workout.id),
                     exercises: exercises
                 )
             }
@@ -281,6 +321,7 @@ final class HistoryStore: ObservableObject {
 @MainActor
 final class WorkoutStore: ObservableObject {
     @Published private(set) var stats: WorkoutStats = WorkoutStats(streak: 0, thisWeekCount: 0, weeklyVolume: 0)
+    @Published var latestPR: PRResult? = nil
 
     private let dbQueue: DatabaseQueue
     private var statsCancellable: AnyCancellable?
@@ -700,6 +741,7 @@ final class WorkoutStore: ObservableObject {
         isCompleted: Bool? = nil,
         restTimerSeconds: Int? = nil
     ) throws {
+        var prResult: PRResult?
         try dbQueue.write { db in
             if var set = try WorkoutSetRecord.fetchOne(db, key: setId) {
                 if let weight { set.weight = weight }
@@ -714,6 +756,48 @@ final class WorkoutStore: ObservableObject {
                 if let isCompleted { set.isCompleted = isCompleted }
                 if let restTimerSeconds { set.restTimerSeconds = restTimerSeconds }
                 try set.update(db)
+            }
+
+            if let weight = weight, let reps = reps, weight > 0, reps > 0 {
+                if let exerciseInfo = try Row.fetchOne(
+                    db,
+                    sql: """
+                        SELECT we.exercise_id, e.name, we.workout_id
+                        FROM workout_sets ws
+                        JOIN workout_exercises we ON we.id = ws.workout_exercise_id
+                        JOIN exercises e ON e.id = we.exercise_id
+                        WHERE ws.id = ?
+                        """,
+                    arguments: [setId]
+                ) {
+                    let exerciseId: String = exerciseInfo["exercise_id"]
+                    let exerciseName: String = exerciseInfo["name"]
+                    let workoutId: String = exerciseInfo["workout_id"]
+
+                    let todayStr = BodyWeightStore.dateString(from: Date())
+                    let bodyWeight = try Double.fetchOne(
+                        db,
+                        sql: "SELECT weight FROM body_weight_entries WHERE date = ?",
+                        arguments: [todayStr]
+                    )
+
+                    prResult = try PRDetectionService.checkForPR(
+                        db: db,
+                        setId: setId,
+                        exerciseId: exerciseId,
+                        exerciseName: exerciseName,
+                        workoutId: workoutId,
+                        weight: weight,
+                        reps: reps,
+                        bodyWeight: bodyWeight
+                    )
+                }
+            }
+        }
+
+        if let pr = prResult {
+            DispatchQueue.main.async {
+                self.latestPR = pr
             }
         }
     }
@@ -1101,5 +1185,45 @@ extension WorkoutStore {
             WHERE w.status = 1 AND w.completed_at >= ?
               AND ws.weight IS NOT NULL AND ws.reps IS NOT NULL
             """, arguments: [startEpoch]) ?? 0
+    }
+}
+
+// MARK: - PR queries
+
+extension WorkoutStore {
+    func fetchLatestPR() throws -> PersonalRecordRecord? {
+        try dbQueue.read { db in
+            try PersonalRecordRecord
+                .order(Column("achieved_at").desc)
+                .fetchOne(db)
+        }
+    }
+
+    func fetchPRs(exerciseId: String) throws -> [PersonalRecordRecord] {
+        try dbQueue.read { db in
+            try PersonalRecordRecord
+                .filter(Column("exercise_id") == exerciseId)
+                .order(Column("achieved_at").desc)
+                .fetchAll(db)
+        }
+    }
+
+    func fetchStrengthSnapshots(exerciseId: String) throws -> [StrengthSnapshotRecord] {
+        try dbQueue.read { db in
+            try StrengthSnapshotRecord
+                .filter(Column("exercise_id") == exerciseId)
+                .order(Column("recorded_at").asc)
+                .fetchAll(db)
+        }
+    }
+
+    func fetchExerciseName(exerciseId: String) throws -> String {
+        try dbQueue.read { db in
+            try String.fetchOne(
+                db,
+                sql: "SELECT name FROM exercises WHERE id = ?",
+                arguments: [exerciseId]
+            )
+        } ?? "Unknown"
     }
 }

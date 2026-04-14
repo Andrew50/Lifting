@@ -92,7 +92,8 @@ struct HistoryView: View {
                         exerciseStore: exerciseStore,
                         subject: .workout(id: workoutId),
                         onFinish: { path.removeAll() },
-                        restTimeSeconds: .constant(120)
+                        restTimeSeconds: .constant(120),
+                        isReadOnly: true
                     )
                 }
             }
@@ -103,15 +104,47 @@ struct HistoryView: View {
 struct WorkoutHistoryBubble: View {
     let workout: WorkoutSummary
 
+    private var subtitleText: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d, yyyy · h:mm a"
+        let dateStr = formatter.string(
+            from: Date(timeIntervalSince1970: workout.completedAt)
+        )
+        if let duration = workout.duration, duration > 0 {
+            let mins = Int(duration) / 60
+            return "\(dateStr) · \(mins) min"
+        }
+        return dateStr
+    }
+
+    private func formatVolume(_ lbs: Double) -> String {
+        if lbs >= 1000 {
+            return String(format: "%.0fk lbs", lbs / 1000)
+        }
+        return String(format: "%.0f lbs", lbs)
+    }
+
     var body: some View {
         HistoryBubble {
             HStack(alignment: .top) {
                 HistoryBubbleHeader(
                     title: workout.name,
-                    subtitle:
-                        "\(workout.completedAt.formatted(.dateTime.month(.defaultDigits).day(.defaultDigits).year(.twoDigits))) \(workout.duration.formattedDuration)"
+                    subtitle: subtitleText
                 )
                 Spacer()
+                if workout.hasPR {
+                    HStack(spacing: 4) {
+                        Image(systemName: "trophy.fill")
+                            .font(.system(size: 10))
+                        Text("PR")
+                            .font(.system(size: 10, weight: .bold))
+                    }
+                    .foregroundStyle(Color(hex: "#D97706"))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color(hex: "#FEF3C7"))
+                    .clipShape(Capsule())
+                }
                 Text("\(workout.exercises.count) exercises")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(AppTheme.accentText)
@@ -119,6 +152,11 @@ struct WorkoutHistoryBubble: View {
                     .padding(.vertical, 4)
                     .background(AppTheme.accentLight)
                     .clipShape(Capsule())
+                if workout.totalVolume > 0 {
+                    Text(formatVolume(workout.totalVolume))
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(AppTheme.textSecondary)
+                }
             }
 
             HistoryDivider()
@@ -126,7 +164,6 @@ struct WorkoutHistoryBubble: View {
             HistoryWorkoutSummaryContent(exercises: workout.exercises)
         }
     }
-
 }
 
 struct HistoryView_Previews: PreviewProvider {

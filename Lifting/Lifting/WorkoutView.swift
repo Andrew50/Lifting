@@ -19,6 +19,7 @@ struct WorkoutView: View {
     @ObservedObject var exerciseStore: ExerciseStore
     @ObservedObject var authStore: AuthStore
     @ObservedObject var bodyWeightStore: BodyWeightStore
+    @ObservedObject var onboardingStore: OnboardingStore
 
     enum Route: Hashable {
         case template(String)
@@ -33,6 +34,9 @@ struct WorkoutView: View {
     @State private var collapsedActiveWorkoutId: String?
     @State private var showWeightLogSheet: Bool = false
     @State private var weightLogText: String = ""
+    @State private var latestPR: PersonalRecordRecord? = nil
+    @State private var latestPRExerciseName: String = ""
+    @State private var isPRDismissed: Bool = false
 
     private let activeWorkoutCollapsedHeight: CGFloat = 72
 
@@ -68,29 +72,94 @@ struct WorkoutView: View {
                             Text(greetingTitle)
                                 .font(.system(size: 28, weight: .heavy))
                                 .foregroundStyle(AppTheme.textPrimary)
-                            Text(dateSubtitle)
-                                .font(.system(size: 14))
-                                .foregroundStyle(AppTheme.textSecondary)
+                            HStack(spacing: 10) {
+                                Text(dateSubtitle)
+                                    .font(.system(size: 13))
+                                    .foregroundStyle(AppTheme.textSecondary)
+
+                                if workoutStore.stats.weeklyVolume > 0 {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "figure.strengthtraining.traditional")
+                                            .font(.system(size: 11))
+                                        Text("\(formatVolume(workoutStore.stats.weeklyVolume)) lbs this week")
+                                            .font(.system(size: 12, weight: .bold))
+                                    }
+                                    .foregroundStyle(AppTheme.accent)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 4)
+                                    .background(AppTheme.accentLighter)
+                                    .overlay(
+                                        Capsule()
+                                            .stroke(AppTheme.accentLight, lineWidth: 1)
+                                    )
+                                    .clipShape(Capsule())
+                                }
+                            }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 16)
                         .padding(.top, 8)
 
-                        // Stat cards
-                        HStack(spacing: 10) {
-                            StatCard(label: "STREAK", value: "\(workoutStore.stats.streak)", unit: "days")
-                            StatCard(label: "THIS WEEK", value: "\(workoutStore.stats.thisWeekCount)", unit: "workouts")
-                            StatCard(label: "VOLUME", value: formatVolume(workoutStore.stats.weeklyVolume), unit: "lbs lifted")
-                        }
-                        .padding(.horizontal, 16)
-
                         // Body Weight card
                         BodyWeightCard(
                             bodyWeightStore: bodyWeightStore,
                             showLogSheet: $showWeightLogSheet,
-                            weightLogText: $weightLogText
+                            weightLogText: $weightLogText,
+                            fitnessGoal: onboardingStore.fitnessGoal
                         )
                         .padding(.horizontal, 16)
+
+                        // PR strip
+                        if let pr = latestPR, !isPRDismissed {
+                            HStack(spacing: 10) {
+                                Image(systemName: "trophy.fill")
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(Color(hex: "#D97706"))
+                                    .frame(width: 28, height: 28)
+                                    .background(Color(hex: "#FEF3C7"))
+                                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("New PR — \(latestPRExerciseName)")
+                                        .font(.system(size: 13, weight: .bold))
+                                        .foregroundStyle(Color(hex: "#065F46"))
+                                    Text(prDetailText(pr))
+                                        .font(.system(size: 11, weight: .medium))
+                                        .foregroundStyle(AppTheme.accent)
+                                }
+
+                                Spacer()
+
+                                Button("Share") {
+                                    // share sheet — implement later
+                                }
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 7)
+                                .background(AppTheme.accent)
+                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                                Button {
+                                    withAnimation(.easeOut(duration: 0.2)) {
+                                        isPRDismissed = true
+                                    }
+                                } label: {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(AppTheme.textTertiary)
+                                }
+                            }
+                            .padding(14)
+                            .background(AppTheme.accentLighter)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(AppTheme.accentLight, lineWidth: 1.5)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .padding(.horizontal, 16)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
 
                         // Start Workout CTA
                         Button {
@@ -277,7 +346,30 @@ struct WorkoutView: View {
         }
         .onAppear {
             resumePendingWorkoutIfNeeded()
+            if let pr = try? workoutStore.fetchLatestPR() {
+                latestPR = pr
+                latestPRExerciseName = (try? workoutStore.fetchExerciseName(exerciseId: pr.exerciseId)) ?? ""
+            }
+            isPRDismissed = false
         }
+        .onChange(of: workoutStore.latestPR) { _, newPR in
+            if newPR != nil {
+                isPRDismissed = false
+                if let pr = try? workoutStore.fetchLatestPR() {
+                    latestPR = pr
+                    latestPRExerciseName = (try? workoutStore.fetchExerciseName(exerciseId: pr.exerciseId)) ?? ""
+                }
+            }
+        }
+    }
+
+    private func prDetailText(_ pr: PersonalRecordRecord) -> String {
+        let weightStr = String(format: "%.0f", pr.weight)
+        var text = "\(weightStr) lbs × \(pr.reps) · Est. 1RM \(String(format: "%.0f", pr.estimated1RM)) lbs"
+        if let improvement = pr.improvement {
+            text += " (+\(String(format: "%.0f", improvement)) lbs)"
+        }
+        return text
     }
 
     private func resumePendingWorkoutIfNeeded() {
@@ -290,44 +382,34 @@ struct WorkoutView: View {
     }
 }
 
-// MARK: - Stat Card
-
-private struct StatCard: View {
-    let label: String
-    let value: String
-    let unit: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(label)
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(AppTheme.textSecondary)
-                .tracking(0.3)
-            Text(value)
-                .font(.system(size: 22, weight: .heavy))
-                .foregroundStyle(AppTheme.textPrimary)
-            Text(unit)
-                .font(.system(size: 10))
-                .foregroundStyle(AppTheme.textSecondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(AppTheme.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(AppTheme.cardBorder, lineWidth: 1)
-        )
-    }
-}
-
 // MARK: - Body Weight Card
 
 private struct BodyWeightCard: View {
     @ObservedObject var bodyWeightStore: BodyWeightStore
     @Binding var showLogSheet: Bool
     @Binding var weightLogText: String
+    var fitnessGoal: FitnessGoal?
+
+    private func weightTrendColor(change: Double) -> Color {
+        guard let goal = fitnessGoal else {
+            return AppTheme.textSecondary
+        }
+        switch goal {
+        case .buildMuscle, .getStronger:
+            if change > 0.3 { return AppTheme.accent }
+            if change < -0.3 { return Color(hex: "#DC2626") }
+            return Color(hex: "#F59E0B")
+
+        case .loseWeight:
+            if change < -0.3 { return AppTheme.accent }
+            if change > 0.3 { return Color(hex: "#DC2626") }
+            return Color(hex: "#F59E0B")
+
+        case .maintain:
+            if abs(change) <= 0.5 { return AppTheme.accent }
+            return Color(hex: "#F59E0B")
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -343,14 +425,10 @@ private struct BodyWeightCard: View {
                             .font(.system(size: 26, weight: .heavy))
                             .foregroundStyle(AppTheme.textPrimary)
 
-                        if let change = bodyWeightStore.weeklyChange {
-                            HStack(spacing: 3) {
-                                Image(systemName: change < 0 ? "arrowtriangle.down.fill" : "arrowtriangle.up.fill")
-                                    .font(.system(size: 9))
-                                Text("\(abs(change), specifier: "%.1f") lbs this week")
-                                    .font(.system(size: 12, weight: .medium))
-                            }
-                            .foregroundStyle(change < 0 ? AppTheme.accent : Color(hex: "#DC2626"))
+                        if let weeklyChange = bodyWeightStore.weeklyChange {
+                            Text("\(weeklyChange > 0 ? "▲" : "▼") \(String(format: "%.1f", abs(weeklyChange))) lbs this week")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(weightTrendColor(change: weeklyChange))
                         } else if bodyWeightStore.recentEntries.count == 1 {
                             Text("Log more days to see trend")
                                 .font(.system(size: 12, weight: .medium))
@@ -593,7 +671,8 @@ struct WorkoutView_Previews: PreviewProvider {
             workoutStore: container.workoutStore,
             exerciseStore: container.exerciseStore,
             authStore: container.authStore,
-            bodyWeightStore: container.bodyWeightStore
+            bodyWeightStore: container.bodyWeightStore,
+            onboardingStore: container.onboardingStore
         )
     }
 }

@@ -19,6 +19,7 @@ final class AppContainer: ObservableObject {
     let authStore: AuthStore
     let csvImporter: CSVImporter
     let bodyWeightStore: BodyWeightStore
+    let onboardingStore: OnboardingStore
 
     init() {
         do {
@@ -34,5 +35,6 @@ final class AppContainer: ObservableObject {
         authStore = AuthStore(db: db)
         csvImporter = CSVImporter(db: db)
         bodyWeightStore = BodyWeightStore(db: db)
+        onboardingStore = OnboardingStore()
     }
 }

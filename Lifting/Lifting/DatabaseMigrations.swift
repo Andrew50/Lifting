@@ -208,6 +208,38 @@ enum DatabaseMigrations {
                     """)
         }
 
+        migrator.registerMigration("v_add_pr_tables") { db in
+            try db.create(table: "personal_records") { t in
+                t.column("id", .text).primaryKey()
+                t.column("exercise_id", .text).notNull()
+                    .references("exercises", onDelete: .cascade)
+                t.column("workout_id", .text).notNull()
+                    .references("workouts", onDelete: .cascade)
+                t.column("set_id", .text).notNull()
+                t.column("type", .text).notNull()
+                t.column("weight", .double).notNull()
+                t.column("reps", .integer).notNull()
+                t.column("estimated_1rm", .double).notNull()
+                t.column("previous_best_1rm", .double)
+                t.column("improvement", .double)
+                t.column("improvement_percent", .double)
+                t.column("body_weight", .double)
+                t.column("achieved_at", .double).notNull()
+            }
+
+            try db.create(table: "strength_snapshots") { t in
+                t.column("id", .text).primaryKey()
+                t.column("exercise_id", .text).notNull()
+                    .references("exercises", onDelete: .cascade)
+                t.column("workout_id", .text).notNull()
+                    .references("workouts", onDelete: .cascade)
+                t.column("estimated_1rm", .double).notNull()
+                t.column("weight", .double).notNull()
+                t.column("reps", .integer).notNull()
+                t.column("recorded_at", .double).notNull()
+            }
+        }
+
         return migrator
     }()
 }

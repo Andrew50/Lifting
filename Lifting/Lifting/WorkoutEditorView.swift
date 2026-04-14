@@ -124,6 +124,7 @@ struct WorkoutEditorView: View {
     @Binding var restTimeSeconds: Int
     /// Called when a set is marked completed — used to auto-start rest timer.
     var onSetCompleted: (() -> Void)?
+    var isReadOnly: Bool = false
 
     @Environment(\.dismiss) private var dismiss
     @AppStorage("weightUnit") private var weightUnit: String = "lbs"
@@ -132,6 +133,7 @@ struct WorkoutEditorView: View {
     @State private var lastLoadedTitle: String = ""
     @State private var hasLoadedInitialTitle: Bool = false
     @State private var isPendingWorkout: Bool = false
+    @State private var isEditingHistory: Bool = false
 
     @State private var templateExercises: [TemplateExerciseDetail] = []
     @State private var workoutExercises: [WorkoutExerciseDetail] = []
@@ -541,7 +543,7 @@ struct WorkoutEditorView: View {
 
                 if isPendingWorkout {
                     // Cancel is in the active workout header (ActiveWorkoutSheetView), not here.
-                } else {
+                } else if !isReadOnly || isEditingHistory {
                     Button {
                         saveAndClose()
                     } label: {
@@ -1239,6 +1241,25 @@ struct WorkoutEditorView: View {
             if case .template = subject {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button("Save") { saveAndClose() }
+                }
+            }
+            if isReadOnly && !isEditingHistory {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button {
+                            isEditingHistory = true
+                        } label: {
+                            Label("Edit Workout", systemImage: "pencil")
+                        }
+                        Button(role: .destructive) {
+                            deleteAndClose()
+                        } label: {
+                            Label("Delete Workout", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .foregroundStyle(AppTheme.textSecondary)
+                    }
                 }
             }
         }
