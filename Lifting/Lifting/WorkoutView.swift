@@ -20,6 +20,7 @@ struct WorkoutView: View {
     @ObservedObject var authStore: AuthStore
     @ObservedObject var bodyWeightStore: BodyWeightStore
     @ObservedObject var onboardingStore: OnboardingStore
+    @ObservedObject var tabNav: TabNavigationCoordinator
 
     enum Route: Hashable {
         case template(String)
@@ -39,14 +40,6 @@ struct WorkoutView: View {
     @State private var isPRDismissed: Bool = false
 
     private let activeWorkoutCollapsedHeight: CGFloat = 72
-
-    private var greetingTitle: String {
-        if let name = authStore.currentUser?.name {
-            let firstName = name.split(separator: " ").first.map(String.init) ?? name
-            return "Hi, \(firstName)!"
-        }
-        return "Hi there!"
-    }
 
     private var dateSubtitle: String {
         let f = DateFormatter()
@@ -69,13 +62,16 @@ struct WorkoutView: View {
                     VStack(spacing: 12) {
                         // Header
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(greetingTitle)
+                            Text("Hi, \(authStore.displayName)!")
                                 .font(.system(size: 28, weight: .heavy))
                                 .foregroundStyle(AppTheme.textPrimary)
-                            HStack(spacing: 10) {
+                            HStack(alignment: .center, spacing: 10) {
                                 Text(dateSubtitle)
                                     .font(.system(size: 13))
                                     .foregroundStyle(AppTheme.textSecondary)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.85)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
 
                                 if workoutStore.stats.weeklyVolume > 0 {
                                     HStack(spacing: 4) {
@@ -83,6 +79,8 @@ struct WorkoutView: View {
                                             .font(.system(size: 11))
                                         Text("\(formatVolume(workoutStore.stats.weeklyVolume)) lbs this week")
                                             .font(.system(size: 12, weight: .bold))
+                                            .lineLimit(1)
+                                            .minimumScaleFactor(0.85)
                                     }
                                     .foregroundStyle(AppTheme.accent)
                                     .padding(.horizontal, 10)
@@ -93,6 +91,7 @@ struct WorkoutView: View {
                                             .stroke(AppTheme.accentLight, lineWidth: 1)
                                     )
                                     .clipShape(Capsule())
+                                    .fixedSize(horizontal: true, vertical: false)
                                 }
                             }
                         }
@@ -105,58 +104,68 @@ struct WorkoutView: View {
                             bodyWeightStore: bodyWeightStore,
                             showLogSheet: $showWeightLogSheet,
                             weightLogText: $weightLogText,
-                            fitnessGoal: onboardingStore.fitnessGoal
+                            fitnessGoal: onboardingStore.fitnessGoal,
+                            tabNav: tabNav
                         )
-                        .padding(.horizontal, 16)
 
                         // PR strip
                         if let pr = latestPR, !isPRDismissed {
-                            HStack(spacing: 10) {
-                                Image(systemName: "trophy.fill")
-                                    .font(.system(size: 18))
-                                    .foregroundStyle(Color(hex: "#D97706"))
-                                    .frame(width: 28, height: 28)
-                                    .background(Color(hex: "#FEF3C7"))
-                                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                            Button {
+                                tabNav.navigateToProgress(segment: .strength)
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "trophy.fill")
+                                        .font(.system(size: 18))
+                                        .foregroundStyle(Color(hex: "#D97706"))
+                                        .frame(width: 28, height: 28)
+                                        .background(Color(hex: "#FEF3C7"))
+                                        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
 
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("New PR — \(latestPRExerciseName)")
-                                        .font(.system(size: 13, weight: .bold))
-                                        .foregroundStyle(Color(hex: "#065F46"))
-                                    Text(prDetailText(pr))
-                                        .font(.system(size: 11, weight: .medium))
-                                        .foregroundStyle(AppTheme.accent)
-                                }
-
-                                Spacer()
-
-                                Button("Share") {
-                                    // share sheet — implement later
-                                }
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 7)
-                                .background(AppTheme.accent)
-                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-
-                                Button {
-                                    withAnimation(.easeOut(duration: 0.2)) {
-                                        isPRDismissed = true
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("New PR — \(latestPRExerciseName)")
+                                            .font(.system(size: 13, weight: .bold))
+                                            .foregroundStyle(Color(hex: "#065F46"))
+                                        Text(prDetailText(pr))
+                                            .font(.system(size: 11, weight: .medium))
+                                            .foregroundStyle(AppTheme.accent)
                                     }
-                                } label: {
-                                    Image(systemName: "xmark")
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundStyle(AppTheme.textTertiary)
+
+                                    Spacer()
+
+                                    Button {
+                                        // share sheet — implement later
+                                    } label: {
+                                        Text("Share")
+                                            .font(.system(size: 12, weight: .bold))
+                                            .foregroundStyle(.white)
+                                            .padding(.horizontal, 13)
+                                            .padding(.vertical, 7)
+                                            .background(AppTheme.accent)
+                                            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                    }
+                                    .buttonStyle(.plain)
+
+                                    Button {
+                                        withAnimation(.easeOut(duration: 0.2)) {
+                                            isPRDismissed = true
+                                        }
+                                    } label: {
+                                        Image(systemName: "xmark")
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .foregroundStyle(AppTheme.textTertiary)
+                                            .padding(4)
+                                    }
+                                    .buttonStyle(.plain)
                                 }
+                                .padding(14)
+                                .background(AppTheme.accentLighter)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .stroke(AppTheme.accentLight, lineWidth: 1.5)
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                             }
-                            .padding(14)
-                            .background(AppTheme.accentLighter)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .stroke(AppTheme.accentLight, lineWidth: 1.5)
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .buttonStyle(.plain)
                             .padding(.horizontal, 16)
                             .transition(.opacity.combined(with: .move(edge: .top)))
                         }
@@ -252,7 +261,8 @@ struct WorkoutView: View {
                     .padding(.top, 8)
                     .padding(.bottom, 20)
                 }
-                .background(AppTheme.background)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .background(AppTheme.background.ignoresSafeArea())
                 .navigationBarHidden(true)
                 .navigationDestination(for: Route.self) { route in
                     switch route {
@@ -339,10 +349,10 @@ struct WorkoutView: View {
         .sheet(isPresented: $showWeightLogSheet) {
             WeightLogSheet(
                 bodyWeightStore: bodyWeightStore,
-                weightText: $weightLogText,
-                onDone: { showWeightLogSheet = false }
+                prefilledWeightText: weightLogText,
+                onDismiss: { showWeightLogSheet = false }
             )
-            .presentationDetents([.height(220)])
+            .presentationDetents([.medium])
         }
         .onAppear {
             resumePendingWorkoutIfNeeded()
@@ -389,6 +399,7 @@ private struct BodyWeightCard: View {
     @Binding var showLogSheet: Bool
     @Binding var weightLogText: String
     var fitnessGoal: FitnessGoal?
+    @ObservedObject var tabNav: TabNavigationCoordinator
 
     private func weightTrendColor(change: Double) -> Color {
         guard let goal = fitnessGoal else {
@@ -412,73 +423,77 @@ private struct BodyWeightCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("BODY WEIGHT")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(AppTheme.textSecondary)
-                        .tracking(0.3)
-
-                    if let latest = bodyWeightStore.latestEntry {
-                        Text("\(latest.weight, specifier: "%.1f") lbs")
-                            .font(.system(size: 26, weight: .heavy))
-                            .foregroundStyle(AppTheme.textPrimary)
-
-                        if let weeklyChange = bodyWeightStore.weeklyChange {
-                            Text("\(weeklyChange > 0 ? "▲" : "▼") \(String(format: "%.1f", abs(weeklyChange))) lbs this week")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(weightTrendColor(change: weeklyChange))
-                        } else if bodyWeightStore.recentEntries.count == 1 {
-                            Text("Log more days to see trend")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundStyle(AppTheme.textSecondary)
-                        }
-                    } else {
-                        Text("No data")
-                            .font(.system(size: 20, weight: .bold))
+        Button {
+            tabNav.navigateToProgress(segment: .bodyWeight)
+        } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("BODY WEIGHT")
+                            .font(.system(size: 11, weight: .semibold))
                             .foregroundStyle(AppTheme.textTertiary)
+                            .tracking(0.5)
+
+                        if let latest = bodyWeightStore.latestEntry {
+                            Text("\(String(format: "%.1f", latest.weight)) lbs")
+                                .font(.system(size: 28, weight: .heavy))
+                                .foregroundStyle(AppTheme.textPrimary)
+
+                            if let weeklyChange = bodyWeightStore.weeklyChange {
+                                Text("\(weeklyChange > 0 ? "▲" : "▼") \(String(format: "%.1f", abs(weeklyChange))) lbs this week")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(weightTrendColor(change: weeklyChange))
+                            } else if bodyWeightStore.recentEntries.count == 1 {
+                                Text("Log more days to see trend")
+                                    .font(.system(size: 12, weight: .medium))
+                                    .foregroundStyle(AppTheme.textSecondary)
+                            }
+                        } else {
+                            Text("No data")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundStyle(AppTheme.textTertiary)
+                        }
                     }
+
+                    Spacer()
+
+                    Button {
+                        if let latest = bodyWeightStore.latestEntry {
+                            let r = (latest.weight * 10).rounded() / 10
+                            weightLogText = r == Double(Int(r)) ? String(Int(r)) : String(format: "%.1f", r)
+                        } else {
+                            weightLogText = ""
+                        }
+                        showLogSheet = true
+                    } label: {
+                        Text("+ Log")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(AppTheme.accent)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(AppTheme.accentLighter)
+                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
                 }
 
-                Spacer()
-
-                Button {
-                    if let latest = bodyWeightStore.latestEntry {
-                        let r = (latest.weight * 10).rounded() / 10
-                        weightLogText = r == Double(Int(r)) ? String(Int(r)) : String(format: "%.1f", r)
-                    } else {
-                        weightLogText = ""
-                    }
-                    showLogSheet = true
-                } label: {
-                    Text("+ Log")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(AppTheme.accent)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(AppTheme.accentLight)
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                if !bodyWeightStore.last7DaysEntries.isEmpty {
+                    let entryCount = bodyWeightStore.last7DaysEntries.count
+                    BodyWeightChartView(entries: bodyWeightStore.last7DaysEntries)
+                        .frame(height: entryCount == 1 ? 44 : 80)
+                        .padding(.top, 10)
                 }
-                .buttonStyle(.plain)
             }
-
-            // Mini chart
-            if !bodyWeightStore.last7DaysEntries.isEmpty {
-                let entryCount = bodyWeightStore.last7DaysEntries.count
-                BodyWeightChartView(entries: bodyWeightStore.last7DaysEntries)
-                    .frame(height: entryCount == 1 ? 44 : 80)
-            }
+            .padding(14)
+            .background(AppTheme.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(AppTheme.cardBorder, lineWidth: 1)
+            )
         }
-        .padding(.horizontal, 14)
-        .padding(.top, 10)
-        .padding(.bottom, 10)
-        .background(AppTheme.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .stroke(AppTheme.cardBorder, lineWidth: 1)
-        )
+        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
     }
 }
 
@@ -553,70 +568,6 @@ private struct BodyWeightChartView: View {
                     .foregroundStyle(AppTheme.textSecondary)
             }
         }
-    }
-}
-
-// MARK: - Weight Log Sheet
-
-private struct WeightLogSheet: View {
-    @ObservedObject var bodyWeightStore: BodyWeightStore
-    @Binding var weightText: String
-    let onDone: () -> Void
-
-    @FocusState private var isFocused: Bool
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 20) {
-                Text("Log Body Weight")
-                    .font(.headline)
-
-                HStack(spacing: 12) {
-                    TextField("0.0", text: $weightText)
-                        .keyboardType(.decimalPad)
-                        .font(.system(size: 28, weight: .bold))
-                        .multilineTextAlignment(.center)
-                        .padding(12)
-                        .background(AppTheme.fieldBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(AppTheme.fieldBorder, lineWidth: 1)
-                        )
-                        .focused($isFocused)
-
-                    Text("lbs")
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundStyle(AppTheme.textSecondary)
-
-                    Button {
-                        guard let weight = Double(weightText.replacingOccurrences(of: ",", with: ".")),
-                              weight > 0 else { return }
-                        try? bodyWeightStore.logWeight(weight)
-                        onDone()
-                    } label: {
-                        Text("Log today")
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 12)
-                            .background(AppTheme.accent)
-                            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.horizontal, 20)
-
-                Spacer()
-            }
-            .padding(.top, 24)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { onDone() }
-                }
-            }
-        }
-        .onAppear { isFocused = true }
     }
 }
 
@@ -699,7 +650,8 @@ struct WorkoutView_Previews: PreviewProvider {
             exerciseStore: container.exerciseStore,
             authStore: container.authStore,
             bodyWeightStore: container.bodyWeightStore,
-            onboardingStore: container.onboardingStore
+            onboardingStore: container.onboardingStore,
+            tabNav: container.tabNavigationCoordinator
         )
     }
 }

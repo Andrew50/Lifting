@@ -190,11 +190,14 @@ struct HistoryWorkoutSummaryContent: View {
 
     private func exerciseSummaryText(_ exercise: WorkoutExerciseSummary) -> String {
         let sets = exercise.setsCount
-        if let weight = exercise.topWeight, let reps = exercise.topReps, weight > 0 {
-            let weightStr = weight == Double(Int(weight))
-                ? String(Int(weight))
-                : String(format: "%.1f", weight)
-            return "\(sets) \(sets == 1 ? "set" : "sets") · \(weightStr) × \(reps)"
+        let unit = DisplayPreferences.displayWeightUnit(for: exercise.exerciseId)
+        if let weightLbs = exercise.topWeight, let reps = exercise.topReps, weightLbs > 0 {
+            let displayWeight = unit == "kg" ? weightLbs / 2.20462 : weightLbs
+            let weightStr = displayWeight == Double(Int(displayWeight))
+                ? String(Int(displayWeight))
+                : String(format: "%.1f", displayWeight)
+            let unitSuffix = unit == "kg" ? " kg" : " lbs"
+            return "\(sets) \(sets == 1 ? "set" : "sets") · \(weightStr)\(unitSuffix) × \(reps)"
         }
         return "\(sets) \(sets == 1 ? "set" : "sets")"
     }

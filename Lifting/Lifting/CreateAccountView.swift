@@ -115,7 +115,7 @@ struct CreateAccountView: View {
                     handleSignUp()
                 } label: {
                     if isLoading {
-                        ProgressView()
+                        SwiftUI.ProgressView()
                             .tint(.white)
                     } else {
                         Text("Sign up")

@@ -232,6 +232,7 @@ final class HistoryStore: ObservableObject {
                 SELECT
                     we.workout_id,
                     we.id,
+                    we.exercise_id,
                     e.name,
                     (SELECT COUNT(*) FROM workout_sets ws WHERE ws.workout_exercise_id = we.id) as setsCount,
                     (SELECT ws2.weight FROM workout_sets ws2
@@ -285,6 +286,7 @@ final class HistoryStore: ObservableObject {
                 let exercises = (exercisesByWorkoutId[workout.id] ?? []).map { row in
                     WorkoutExerciseSummary(
                         id: row["id"],
+                        exerciseId: row["exercise_id"],
                         name: row["name"],
                         setsCount: row["setsCount"],
                         topWeight: row["topWeight"] as Double?,
@@ -1124,6 +1126,15 @@ final class BodyWeightStore: ObservableObject {
                 )
                 try entry.insert(db)
             }
+        }
+    }
+
+    func deleteEntry(id: String) throws {
+        try dbQueue.write { db in
+            try db.execute(
+                sql: "DELETE FROM body_weight_entries WHERE id = ?",
+                arguments: [id]
+            )
         }
     }
 

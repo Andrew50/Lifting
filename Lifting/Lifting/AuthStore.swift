@@ -35,6 +35,35 @@ final class AuthStore: ObservableObject {
 
     private let dbQueue: DatabaseQueue
     private static let sessionUserIdKey = "loggedInUserId"
+    private static let displayNameKey = "user.displayName"
+
+    var currentEmail: String? {
+        currentUser?.email
+    }
+
+    var displayName: String {
+        if let name = UserDefaults.standard.string(forKey: Self.displayNameKey),
+           !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        {
+            return name.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let email = currentEmail {
+            let prefix = email.components(separatedBy: "@").first ?? email
+            guard !prefix.isEmpty else { return "there" }
+            return prefix.prefix(1).uppercased() + prefix.dropFirst()
+        }
+        return "there"
+    }
+
+    func setDisplayName(_ name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            UserDefaults.standard.removeObject(forKey: Self.displayNameKey)
+        } else {
+            UserDefaults.standard.set(trimmed, forKey: Self.displayNameKey)
+        }
+        objectWillChange.send()
+    }
 
     init(db: AppDatabase) {
         self.dbQueue = db.dbQueue
@@ -151,6 +180,10 @@ final class AuthStore: ObservableObject {
     func logOut() {
         currentUser = nil
         UserDefaults.standard.removeObject(forKey: Self.sessionUserIdKey)
+    }
+
+    func signOut() {
+        logOut()
     }
 
     // MARK: - Session persistence

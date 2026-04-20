@@ -16,6 +16,8 @@ struct ProfileView: View {
     @State private var showImportAlert = false
     @State private var showClearConfirmation = false
     @State private var isFileImporterPresented = false
+    @State private var isEditingName = false
+    @State private var showLogOutConfirm = false
 
     @AppStorage("weightUnit") private var weightUnit: String = "lbs"
     @AppStorage("distanceUnit") private var distanceUnit: String = "mi"
@@ -34,14 +36,25 @@ struct ProfileView: View {
     }
 
     var body: some View {
-        Group {
-            if let user = authStore.currentUser {
-                loggedInContent(user: user)
-            } else {
-                loggedOutContent
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Profile")
+                .font(.system(size: 32, weight: .heavy))
+                .foregroundStyle(AppTheme.textPrimary)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
+
+            Group {
+                if let user = authStore.currentUser {
+                    loggedInContent(user: user)
+                } else {
+                    loggedOutContent
+                }
             }
         }
-        .navigationTitle("Profile")
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(AppTheme.background.ignoresSafeArea())
+        .navigationBarHidden(true)
         .sheet(isPresented: $isAuthSheetPresented) {
             NavigationStack {
                 LoginView(
@@ -50,6 +63,12 @@ struct ProfileView: View {
                 )
                 .navigationBarTitleDisplayMode(.inline)
             }
+        }
+        .sheet(isPresented: $isEditingName) {
+            EditDisplayNameSheet(authStore: authStore) {
+                isEditingName = false
+            }
+            .presentationDetents([.height(280)])
         }
         .alert("Import Status", isPresented: $showImportAlert) {
             Button("OK", role: .cancel) {}
@@ -76,6 +95,18 @@ struct ProfileView: View {
             allowsMultipleSelection: false
         ) { result in
             handleFilePicker(result: result)
+        }
+        .confirmationDialog(
+            "Log out of your account?",
+            isPresented: $showLogOutConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Log Out", role: .destructive) {
+                authStore.signOut()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Your local data will remain on this device.")
         }
     }
 
@@ -268,28 +299,37 @@ struct ProfileView: View {
         ScrollView {
             VStack(spacing: 20) {
                 // Profile card
-                HStack(spacing: 16) {
-                    Image(systemName: "person.circle.fill")
-                        .font(.system(size: 52))
-                        .foregroundStyle(AppTheme.accent)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(user.name)
-                            .font(.title3)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(AppTheme.textPrimary)
-                        Text(user.email)
-                            .font(.subheadline)
-                            .foregroundStyle(AppTheme.textSecondary)
+                Button {
+                    isEditingName = true
+                } label: {
+                    HStack(spacing: 16) {
+                        Image(systemName: "person.circle.fill")
+                            .font(.system(size: 52))
+                            .foregroundStyle(AppTheme.accent)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(authStore.displayName)
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(AppTheme.textPrimary)
+                            Text(user.email)
+                                .font(.subheadline)
+                                .foregroundStyle(AppTheme.textSecondary)
+                        }
+                        Spacer()
+                        Image(systemName: "pencil")
+                            .font(.system(size: 13))
+                            .foregroundStyle(AppTheme.textTertiary)
                     }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(AppTheme.cardBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(AppTheme.cardBorder, lineWidth: 1)
+                    )
                 }
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(AppTheme.cardBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(AppTheme.cardBorder, lineWidth: 1)
-                )
+                .buttonStyle(.plain)
                 .padding(.horizontal, 16)
 
                 // Member since
@@ -330,7 +370,7 @@ struct ProfileView: View {
                             .foregroundStyle(AppTheme.textPrimary)
                         Spacer()
                         if isImporting {
-                            ProgressView()
+                            SwiftUI.ProgressView()
                         }
                     }
                     .padding(.horizontal, 16)
@@ -377,27 +417,22 @@ struct ProfileView: View {
                         .padding(.horizontal, 16)
                 }
 
-                // Log out
-                Button(role: .destructive) {
-                    withAnimation {
-                        authStore.logOut()
-                    }
+                Spacer().frame(height: 24)
+
+                Button {
+                    showLogOutConfirm = true
                 } label: {
-                    HStack {
-                        Spacer()
-                        Text("Log out")
-                            .fontWeight(.medium)
-                        Spacer()
-                    }
-                    .padding(.vertical, 12)
+                    Text("Log Out")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Color(hex: "#DC2626"))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(Color(hex: "#FEE2E2"))
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
-                .background(AppTheme.cardBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(AppTheme.cardBorder, lineWidth: 1)
-                )
                 .padding(.horizontal, 16)
+
+                Spacer().frame(height: 40)
             }
             .padding(.top, 8)
             .padding(.bottom, 20)

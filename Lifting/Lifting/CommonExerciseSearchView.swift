@@ -9,6 +9,8 @@ struct CommonExerciseSearchView: View {
     @ObservedObject var exerciseStore: ExerciseStore
     let onSelect: (ExerciseRecord) -> Void
     var navigationTitle: String = "Exercises"
+    /// When false, the parent supplies a custom header; omit system navigation title (e.g. Exercises tab root).
+    var usesNavigationTitle: Bool = true
     var showFrequency: Bool = true
 
     // Balance between fuzzy match and frequency (0.0 to 1.0)
@@ -56,6 +58,20 @@ struct CommonExerciseSearchView: View {
     }
 
     var body: some View {
+        Group {
+            if usesNavigationTitle {
+                listContent
+                    .navigationTitle(navigationTitle)
+            } else {
+                listContent
+            }
+        }
+        .task {
+            await exerciseStore.loadAll()
+        }
+    }
+
+    private var listContent: some View {
         VStack(spacing: 0) {
             searchBar
 
@@ -113,10 +129,6 @@ struct CommonExerciseSearchView: View {
             }
         }
         .background(AppTheme.background)
-        .navigationTitle(navigationTitle)
-        .task {
-            await exerciseStore.loadAll()
-        }
     }
 
     private var searchBar: some View {

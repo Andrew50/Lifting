@@ -10,7 +10,8 @@ import GRDB
 
 // MARK: - User
 
-struct UserRecord: Codable, FetchableRecord, PersistableRecord, TableRecord, Identifiable, Hashable {
+struct UserRecord: Codable, FetchableRecord, PersistableRecord, TableRecord, Identifiable, Hashable
+{
     static let databaseTableName = "users"
 
     var id: String
@@ -34,7 +35,9 @@ struct UserRecord: Codable, FetchableRecord, PersistableRecord, TableRecord, Ide
 
 // MARK: - Exercise
 
-struct ExerciseRecord: Codable, FetchableRecord, PersistableRecord, TableRecord, Identifiable, Hashable {
+struct ExerciseRecord: Codable, FetchableRecord, PersistableRecord, TableRecord, Identifiable,
+    Hashable
+{
     static let databaseTableName = "exercises"
 
     var id: String
@@ -55,7 +58,9 @@ struct ExerciseRecord: Codable, FetchableRecord, PersistableRecord, TableRecord,
 
 // MARK: - Templates
 
-struct TemplateRecord: Codable, FetchableRecord, PersistableRecord, TableRecord, Identifiable, Hashable {
+struct TemplateRecord: Codable, FetchableRecord, PersistableRecord, TableRecord, Identifiable,
+    Hashable
+{
     static let databaseTableName = "templates"
 
     var id: String
@@ -77,7 +82,9 @@ struct TemplateRecord: Codable, FetchableRecord, PersistableRecord, TableRecord,
     }
 }
 
-struct TemplateExerciseRecord: Codable, FetchableRecord, PersistableRecord, TableRecord, Identifiable, Hashable {
+struct TemplateExerciseRecord: Codable, FetchableRecord, PersistableRecord, TableRecord,
+    Identifiable, Hashable
+{
     static let databaseTableName = "template_exercises"
 
     var id: String
@@ -110,7 +117,9 @@ enum WorkoutStatus: Int, Codable {
     case completed = 1
 }
 
-struct WorkoutRecord: Codable, FetchableRecord, PersistableRecord, TableRecord, Identifiable, Hashable {
+struct WorkoutRecord: Codable, FetchableRecord, PersistableRecord, TableRecord, Identifiable,
+    Hashable
+{
     static let databaseTableName = "workouts"
 
     var id: String
@@ -142,7 +151,9 @@ struct WorkoutRecord: Codable, FetchableRecord, PersistableRecord, TableRecord, 
     }
 }
 
-struct WorkoutExerciseRecord: Codable, FetchableRecord, PersistableRecord, TableRecord, Identifiable, Hashable {
+struct WorkoutExerciseRecord: Codable, FetchableRecord, PersistableRecord, TableRecord,
+    Identifiable, Hashable
+{
     static let databaseTableName = "workout_exercises"
 
     var id: String
@@ -165,7 +176,9 @@ struct WorkoutExerciseRecord: Codable, FetchableRecord, PersistableRecord, Table
     }
 }
 
-struct WorkoutSetRecord: Codable, FetchableRecord, PersistableRecord, TableRecord, Identifiable, Hashable {
+struct WorkoutSetRecord: Codable, FetchableRecord, PersistableRecord, TableRecord, Identifiable,
+    Hashable
+{
     static let databaseTableName = "workout_sets"
 
     var id: String
@@ -208,7 +221,9 @@ struct WorkoutSetRecord: Codable, FetchableRecord, PersistableRecord, TableRecor
 
 // MARK: - Body Weight
 
-struct BodyWeightEntryRecord: Codable, FetchableRecord, PersistableRecord, TableRecord, Identifiable, Hashable {
+struct BodyWeightEntryRecord: Codable, FetchableRecord, PersistableRecord, TableRecord,
+    Identifiable, Hashable
+{
     static let databaseTableName = "body_weight_entries"
 
     var id: String
@@ -230,7 +245,9 @@ struct BodyWeightEntryRecord: Codable, FetchableRecord, PersistableRecord, Table
 
 // MARK: - Personal Records
 
-struct PersonalRecordRecord: Codable, FetchableRecord, PersistableRecord, TableRecord, Identifiable, Hashable {
+struct PersonalRecordRecord: Codable, FetchableRecord, PersistableRecord, TableRecord, Identifiable,
+    Hashable
+{
     static let databaseTableName = "personal_records"
 
     var id: String
@@ -267,7 +284,9 @@ struct PersonalRecordRecord: Codable, FetchableRecord, PersistableRecord, TableR
     }
 }
 
-struct StrengthSnapshotRecord: Codable, FetchableRecord, PersistableRecord, TableRecord, Identifiable, Hashable {
+struct StrengthSnapshotRecord: Codable, FetchableRecord, PersistableRecord, TableRecord,
+    Identifiable, Hashable
+{
     static let databaseTableName = "strength_snapshots"
 
     var id: String
@@ -306,6 +325,7 @@ struct WorkoutSummary: Identifiable, Hashable {
 
 struct WorkoutExerciseSummary: Identifiable, Hashable {
     var id: String
+    var exerciseId: String
     var name: String
     var setsCount: Int
     var topWeight: Double?
@@ -367,4 +387,3 @@ struct WorkoutExerciseDetail: Identifiable, Hashable {
     var sortOrder: Int
     var sets: [WorkoutSetDetail]
 }
-

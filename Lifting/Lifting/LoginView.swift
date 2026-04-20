@@ -96,7 +96,7 @@ struct LoginView: View {
                     handleLogIn()
                 } label: {
                     if isLoading {
-                        ProgressView()
+                        SwiftUI.ProgressView()
                             .tint(.white)
                     } else {
                         Text("Log in")

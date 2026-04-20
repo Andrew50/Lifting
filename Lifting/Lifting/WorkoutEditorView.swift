@@ -1221,7 +1221,7 @@ struct WorkoutEditorView: View {
                             Label("Delete Workout", systemImage: "trash")
                         }
                     } label: {
-                        Image(systemName: "ellipsis.circle")
+                        Image(systemName: "ellipsis")
                             .foregroundStyle(AppTheme.textSecondary)
                     }
                 }

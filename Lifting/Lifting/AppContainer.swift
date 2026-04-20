@@ -20,6 +20,7 @@ final class AppContainer: ObservableObject {
     let csvImporter: CSVImporter
     let bodyWeightStore: BodyWeightStore
     let onboardingStore: OnboardingStore
+    let tabNavigationCoordinator = TabNavigationCoordinator()
 
     init() {
         do {

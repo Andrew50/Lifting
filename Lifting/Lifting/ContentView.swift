@@ -13,19 +13,13 @@ import SwiftUI
 
 struct ContentView: View {
     @ObservedObject var container: AppContainer
-
-    private enum AppTab: Hashable {
-        case workout
-        case history
-        case exercises
-        case profile
-    }
+    @ObservedObject var tabNav: TabNavigationCoordinator
 
     private let preferredWorkoutTabIconName = "figure.strengthtraining.traditional"
     private let fallbackWorkoutTabIconName = "dumbbell"
 
-    private let preferredHistoryTabIconName = "clock.arrow.circlepath"
-    private let fallbackHistoryTabIconName = "clock"
+    private let preferredProgressTabIconName = "chart.line.uptrend.xyaxis"
+    private let fallbackProgressTabIconName = "chart.xyaxis.line"
 
     private let preferredExercisesTabIconName = "list.bullet"
     private let fallbackExercisesTabIconName = "list.bullet"
@@ -33,7 +27,6 @@ struct ContentView: View {
     private let preferredProfileTabIconName = "person.circle"
     private let fallbackProfileTabIconName = "person"
 
-    @State private var selectedTab: AppTab = .workout
     @StateObject private var tabReselect = TabReselectCoordinator()
 
     private func resolvedIconName(preferred: String, fallback: String) -> String {
@@ -58,31 +51,34 @@ struct ContentView: View {
     }
 
     private var mainTabView: some View {
-        TabView(selection: $selectedTab) {
+        TabView(selection: $tabNav.selectedTab) {
             WorkoutView(
                 templateStore: container.templateStore,
                 workoutStore: container.workoutStore,
                 exerciseStore: container.exerciseStore,
                 authStore: container.authStore,
                 bodyWeightStore: container.bodyWeightStore,
-                onboardingStore: container.onboardingStore
+                onboardingStore: container.onboardingStore,
+                tabNav: tabNav
             )
             .tabItem {
                 Label("Workout", systemImage: resolvedIconName(preferred: preferredWorkoutTabIconName, fallback: fallbackWorkoutTabIconName))
             }
             .tag(AppTab.workout)
 
-            HistoryView(
+            ProgressView(
                 historyStore: container.historyStore,
                 workoutStore: container.workoutStore,
                 templateStore: container.templateStore,
                 exerciseStore: container.exerciseStore,
-                tabReselect: tabReselect
+                bodyWeightStore: container.bodyWeightStore,
+                tabReselect: tabReselect,
+                tabNav: tabNav
             )
             .tabItem {
-                Label("History", systemImage: resolvedIconName(preferred: preferredHistoryTabIconName, fallback: fallbackHistoryTabIconName))
+                Label("Progress", systemImage: resolvedIconName(preferred: preferredProgressTabIconName, fallback: fallbackProgressTabIconName))
             }
-            .tag(AppTab.history)
+            .tag(AppTab.progress)
 
             NavigationStack {
                 ExerciseListView(container: container)
@@ -113,6 +109,7 @@ struct ContentView: View {
 
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
-        ContentView(container: AppContainer())
+        let container = AppContainer()
+        return ContentView(container: container, tabNav: container.tabNavigationCoordinator)
     }
 }
