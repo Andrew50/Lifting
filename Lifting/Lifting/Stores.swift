@@ -323,12 +323,28 @@ final class WorkoutStore: ObservableObject {
     @Published private(set) var stats: WorkoutStats = WorkoutStats(streak: 0, thisWeekCount: 0, weeklyVolume: 0)
     @Published var latestPR: PRResult? = nil
 
+    /// Rest countdown end time for the active workout sheet (survives collapsing to the in-tab bar).
+    @Published var activeRestTimerWorkoutId: String?
+    @Published var activeRestTimerEndDate: Date?
+    /// Last chosen rest-between-sets duration (seconds) for the active workout UI.
+    @Published var activeWorkoutRestPresetSeconds: Int = 120
+
     private let dbQueue: DatabaseQueue
     private var statsCancellable: AnyCancellable?
 
     init(db: AppDatabase) {
         self.dbQueue = db.dbQueue
         startObservingStats()
+    }
+
+    func setActiveRestTimer(workoutId: String, endDate: Date?) {
+        if let endDate {
+            activeRestTimerWorkoutId = workoutId
+            activeRestTimerEndDate = endDate
+        } else if activeRestTimerWorkoutId == workoutId {
+            activeRestTimerWorkoutId = nil
+            activeRestTimerEndDate = nil
+        }
     }
 
     private func startObservingStats() {

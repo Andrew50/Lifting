@@ -47,46 +47,9 @@ enum AppTheme {
     static let dropSetBackground = Color(hex: "#EDE9FE")
     static let dropSetText = Color(hex: "#7C3AED")
     static let inactiveOpacity = 0.6
-    static let doneOpacity = 0.5
 }
 
 // MARK: - Hosts row content and adds UISwipeGestureRecognizer (does not block ScrollView vertical scrolling)
-private struct SetRowWithSwipe<Content: View>: UIViewRepresentable {
-    let content: Content
-    let onSwipeLeft: () -> Void
-
-    func makeUIView(context: Context) -> UIView {
-        let host = UIHostingController(rootView: content)
-        host.view.backgroundColor = .clear
-        let swipe = UISwipeGestureRecognizer(
-            target: context.coordinator, action: #selector(Coordinator.didSwipeLeft(_:)))
-        swipe.direction = .left
-        host.view.addGestureRecognizer(swipe)
-        context.coordinator.host = host
-        return host.view!
-    }
-
-    func updateUIView(_ uiView: UIView, context: Context) {
-        context.coordinator.host?.rootView = content
-    }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onSwipeLeft: onSwipeLeft)
-    }
-
-    class Coordinator: NSObject {
-        var onSwipeLeft: () -> Void
-        weak var host: UIHostingController<Content>?
-
-        init(onSwipeLeft: @escaping () -> Void) {
-            self.onSwipeLeft = onSwipeLeft
-        }
-
-        @objc func didSwipeLeft(_: UISwipeGestureRecognizer) {
-            onSwipeLeft()
-        }
-    }
-}
 
 private enum SetRowMetrics {
     static let gap: CGFloat = 6
@@ -1181,6 +1144,7 @@ struct WorkoutEditorView: View {
                         reloadPreservingTitleEdits()
                     }
                 )
+                .id("\(set.id)-\(set.isWarmUp ?? false)-\(set.isDropSet ?? false)-\(String(describing: set.rpe))")
             }
 
             // Card footer
@@ -1681,32 +1645,57 @@ private struct SheetSetRow: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    .background(AppTheme.cardBackground)
     }
 
     var body: some View {
         ZStack(alignment: .trailing) {
-            SetRowWithSwipe(
-                content: setRowContent,
-                onSwipeLeft: {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                        swipeOffset = -70
-                    }
+            HStack {
+                Spacer()
+                Button {
+                    onDelete()
+                } label: {
+                    Image(systemName: "trash.fill")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(Color(hex: "#DC2626"))
+                        .frame(width: 70)
+                        .frame(maxHeight: .infinity)
                 }
-            )
-            .offset(x: swipeOffset)
+                .buttonStyle(.plain)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
-            if swipeOffset < 0 {
-                Color.clear
-                    .contentShape(.rect)
-                    .onTapGesture {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            swipeOffset = 0
+            setRowContent
+                .offset(x: swipeOffset)
+                .gesture(
+                    DragGesture(minimumDistance: 20, coordinateSpace: .local)
+                        .onChanged { value in
+                            guard value.translation.width < 0 else { return }
+                            let raw = value.translation.width
+                            let clamped = max(raw, -70)
+                            swipeOffset = clamped
+                        }
+                        .onEnded { value in
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                if value.translation.width < -40 {
+                                    swipeOffset = -70
+                                } else {
+                                    swipeOffset = 0
+                                }
+                            }
+                        }
+                )
+                .simultaneousGesture(
+                    TapGesture().onEnded {
+                        if swipeOffset < 0 {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                swipeOffset = 0
+                            }
                         }
                     }
-            }
+                )
         }
         .clipped()
-        .opacity(isCompleted ? AppTheme.doneOpacity : 1.0)
         .onAppear {
             localCompleted = set.isCompleted ?? false
             refreshDisplayFromPreferences()

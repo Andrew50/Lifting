@@ -7,6 +7,7 @@
 
 import SwiftUI
 import UIKit
+import UserNotifications
 
 @main
 struct LiftingApp: App {
@@ -26,6 +27,10 @@ struct LiftingApp: App {
         ]
         UINavigationBar.appearance().scrollEdgeAppearance = scrollEdge
         UINavigationBar.appearance().standardAppearance = standard
+
+        UNUserNotificationCenter.current().requestAuthorization(
+            options: [.alert, .sound, .badge]
+        ) { _, _ in }
     }
 
     var body: some Scene {

@@ -3,8 +3,8 @@
 //  Lifting
 //
 
-import Combine
 import SwiftUI
+import UserNotifications
 
 struct ActiveWorkoutSheetView: View {
     @ObservedObject var templateStore: TemplateStore
@@ -27,33 +27,54 @@ struct ActiveWorkoutSheetView: View {
     @State private var showCancelConfirmation = false
     @State private var emptySetsCount = 0
 
-    // Rest countdown timer
-    @State private var restCountdownRemaining: Int = 0
-    @State private var restCountdownActive: Bool = false
-    @State private var restCountdownTimer: AnyCancellable?
+    /// Absolute time when the current rest period ends (nil = no active rest).
+    @State private var restEndDate: Date?
+
+    private var restCountdownActive: Bool { restEndDate != nil }
 
     private let restTimeOptions = [30, 45, 60, 90, 120, 180]
 
+    private static let notificationID = "rest-timer-done"
+
     private func startRestCountdown() {
-        restCountdownRemaining = restTimeSeconds
-        restCountdownActive = true
-        restCountdownTimer?.cancel()
-        restCountdownTimer = Timer.publish(every: 1, on: .main, in: .common)
-            .autoconnect()
-            .sink { _ in
-                if restCountdownRemaining > 0 {
-                    restCountdownRemaining -= 1
-                } else {
-                    stopRestCountdown()
-                }
-            }
+        let end = Date().addingTimeInterval(Double(restTimeSeconds))
+        restEndDate = end
+        workoutStore.setActiveRestTimer(workoutId: workoutId, endDate: end)
+        scheduleRestNotification(at: end)
     }
 
     private func stopRestCountdown() {
-        restCountdownActive = false
-        restCountdownRemaining = 0
-        restCountdownTimer?.cancel()
-        restCountdownTimer = nil
+        restEndDate = nil
+        workoutStore.setActiveRestTimer(workoutId: workoutId, endDate: nil)
+        UNUserNotificationCenter.current().removePendingNotificationRequests(
+            withIdentifiers: [Self.notificationID]
+        )
+    }
+
+    private func remainingSeconds(now: Date) -> Int {
+        guard let end = restEndDate else { return 0 }
+        return max(0, Int(ceil(end.timeIntervalSince(now))))
+    }
+
+    private func scheduleRestNotification(at fireDate: Date) {
+        let center = UNUserNotificationCenter.current()
+        center.removePendingNotificationRequests(withIdentifiers: [Self.notificationID])
+
+        let content = UNMutableNotificationContent()
+        content.title = "Rest Over"
+        content.body = "Time to start your next set!"
+        content.sound = .default
+
+        let trigger = UNTimeIntervalNotificationTrigger(
+            timeInterval: max(1, fireDate.timeIntervalSinceNow),
+            repeats: false
+        )
+        let request = UNNotificationRequest(
+            identifier: Self.notificationID,
+            content: content,
+            trigger: trigger
+        )
+        center.add(request)
     }
 
     var body: some View {
@@ -63,6 +84,16 @@ struct ActiveWorkoutSheetView: View {
                 if let workout = try? workoutStore.fetchWorkout(workoutId: workoutId) {
                     workoutStartedAt = workout.startedAt
                 }
+                restTimeSeconds = workoutStore.activeWorkoutRestPresetSeconds
+                if workoutStore.activeRestTimerWorkoutId == workoutId,
+                   let end = workoutStore.activeRestTimerEndDate,
+                   end > Date() {
+                    restEndDate = end
+                    scheduleRestNotification(at: end)
+                }
+            }
+            .onChange(of: restTimeSeconds) { _, newValue in
+                workoutStore.activeWorkoutRestPresetSeconds = newValue
             }
             .onChange(of: selectedDetent) { _, newDetent in
                 if newDetent == Self.collapsedDetent {
@@ -88,26 +119,35 @@ struct ActiveWorkoutSheetView: View {
 
                 Spacer()
 
-                VStack(spacing: 1) {
-                    if restCountdownActive {
-                        Text("Rest")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(AppTheme.textSecondary)
-                            .textCase(.uppercase)
-                            .tracking(0.5)
-                        Text(restCountdownRemaining.formattedAsMinutesSeconds)
-                            .font(.system(size: 22, weight: .heavy).monospacedDigit())
-                            .foregroundStyle(AppTheme.accent)
-                    } else {
-                        Text("Elapsed")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(AppTheme.textSecondary)
-                            .textCase(.uppercase)
-                            .tracking(0.5)
-                        TimelineView(.periodic(from: .now, by: 1.0)) { _ in
+                TimelineView(.periodic(from: .now, by: 1.0)) { timeline in
+                    let now = timeline.date
+                    let remaining = remainingSeconds(now: now)
+                    let isResting = restEndDate != nil && remaining > 0
+
+                    VStack(spacing: 1) {
+                        if isResting {
+                            Text("Rest")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(AppTheme.textSecondary)
+                                .textCase(.uppercase)
+                                .tracking(0.5)
+                            Text(remaining.formattedAsMinutesSeconds)
+                                .font(.system(size: 22, weight: .heavy).monospacedDigit())
+                                .foregroundStyle(AppTheme.accent)
+                        } else {
+                            Text("Elapsed")
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(AppTheme.textSecondary)
+                                .textCase(.uppercase)
+                                .tracking(0.5)
                             Text(TimeInterval.elapsed(since: workoutStartedAt))
                                 .font(.system(size: 22, weight: .heavy).monospacedDigit())
                                 .foregroundStyle(AppTheme.textPrimary)
+                        }
+                    }
+                    .onChange(of: isResting) { wasResting, nowResting in
+                        if wasResting && !nowResting {
+                            stopRestCountdown()
                         }
                     }
                 }
@@ -131,7 +171,7 @@ struct ActiveWorkoutSheetView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
             .background(AppTheme.background)
-            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: restCountdownActive)
+            .animation(.spring(response: 0.3, dampingFraction: 0.7), value: restEndDate != nil)
             .alert(
                 "Finish Workout?",
                 isPresented: $showFinishConfirmation
@@ -226,6 +266,7 @@ struct ActiveWorkoutSheetView: View {
     }
 
     private func finishWorkout() {
+        stopRestCountdown()
         withAnimation(.easeInOut(duration: 0.2)) {
             isFinishing = true
         }
@@ -238,6 +279,7 @@ struct ActiveWorkoutSheetView: View {
     }
 
     private func cancelWorkout() {
+        stopRestCountdown()
         do {
             try workoutStore.discardPendingWorkout(workoutId: workoutId)
         } catch {}

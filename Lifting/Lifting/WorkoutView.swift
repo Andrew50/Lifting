@@ -627,7 +627,6 @@ private struct CollapsedWorkoutBarView: View {
     let onTap: () -> Void
 
     @State private var workoutName: String = "Workout"
-    @State private var workoutStartedAt: TimeInterval?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -639,10 +638,34 @@ private struct CollapsedWorkoutBarView: View {
 
             Spacer(minLength: 8)
 
-            TimelineView(.periodic(from: .now, by: 1.0)) { _ in
-                Text(TimeInterval.elapsed(since: workoutStartedAt))
-                    .font(.system(size: 15, weight: .medium).monospacedDigit())
-                    .foregroundStyle(AppTheme.accent)
+            TimelineView(.periodic(from: .now, by: 1.0)) { timeline in
+                let now = timeline.date
+                let matches = workoutStore.activeRestTimerWorkoutId == workoutId
+                let end = workoutStore.activeRestTimerEndDate
+                let remaining: Int = {
+                    guard matches, let end else { return 0 }
+                    return max(0, Int(ceil(end.timeIntervalSince(now))))
+                }()
+                let isLiveRestCountdown = matches && remaining > 0
+                let displaySeconds = isLiveRestCountdown
+                    ? remaining
+                    : workoutStore.activeWorkoutRestPresetSeconds
+
+                HStack(spacing: 6) {
+                    Text("Rest")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(AppTheme.textSecondary)
+                    Text(displaySeconds.formattedAsMinutesSeconds)
+                        .font(.system(size: 15, weight: .medium).monospacedDigit())
+                        .foregroundStyle(isLiveRestCountdown ? AppTheme.accent : AppTheme.textPrimary)
+                }
+                .onChange(of: isLiveRestCountdown) { wasLive, isLive in
+                    if wasLive && !isLive,
+                       workoutStore.activeRestTimerWorkoutId == workoutId,
+                       workoutStore.activeRestTimerEndDate != nil {
+                        workoutStore.setActiveRestTimer(workoutId: workoutId, endDate: nil)
+                    }
+                }
             }
         }
         .padding(.horizontal, 16)
@@ -657,7 +680,11 @@ private struct CollapsedWorkoutBarView: View {
         .onAppear {
             if let workout = try? workoutStore.fetchWorkout(workoutId: workoutId) {
                 workoutName = workout.name
-                workoutStartedAt = workout.startedAt
+            }
+            if workoutStore.activeRestTimerWorkoutId == workoutId,
+               let end = workoutStore.activeRestTimerEndDate,
+               end <= Date() {
+                workoutStore.setActiveRestTimer(workoutId: workoutId, endDate: nil)
             }
         }
     }
