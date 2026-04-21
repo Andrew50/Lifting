@@ -86,8 +86,11 @@ final class PRDetectionService {
         )
         try snapshot.insert(db)
 
-        let buffer = 0.001
-        guard new1RM > historical1RM + buffer else { return nil }
+        if historical1RM > 0 {
+            // Require meaningful improvement, not just equal or tiny floating-point difference
+            let meaningfulBuffer = max(historical1RM * 0.001, 0.5)
+            guard new1RM > historical1RM + meaningfulBuffer else { return nil }
+        }
 
         let improvement = historical1RM > 0 ? new1RM - historical1RM : nil
         let improvementPercent = (historical1RM > 0 && improvement != nil)

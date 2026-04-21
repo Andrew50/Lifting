@@ -240,6 +240,18 @@ enum DatabaseMigrations {
             }
         }
 
+        migrator.registerMigration("v_dedupe_prs") { db in
+            try db.execute(
+                sql: """
+                    DELETE FROM personal_records
+                    WHERE id NOT IN (
+                        SELECT MIN(id)
+                        FROM personal_records
+                        GROUP BY exercise_id, weight, reps, ROUND(estimated_1rm, 1)
+                    )
+                    """)
+        }
+
         return migrator
     }()
 }

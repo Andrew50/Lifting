@@ -22,6 +22,8 @@ final class AppContainer: ObservableObject {
     let onboardingStore: OnboardingStore
     let tabNavigationCoordinator = TabNavigationCoordinator()
 
+    private var cancellables = Set<AnyCancellable>()
+
     init() {
         do {
             db = try AppDatabase()
@@ -37,5 +39,15 @@ final class AppContainer: ObservableObject {
         csvImporter = CSVImporter(db: db)
         bodyWeightStore = BodyWeightStore(db: db)
         onboardingStore = OnboardingStore()
+
+        // Nested stores are not @Published on this type; forward their changes so
+        // views using @ObservedObject AppContainer (e.g. ContentView) refresh when
+        // onboarding or auth state changes.
+        onboardingStore.objectWillChange
+            .sink { [weak self] (_: Void) in self?.objectWillChange.send() }
+            .store(in: &cancellables)
+        authStore.objectWillChange
+            .sink { [weak self] (_: Void) in self?.objectWillChange.send() }
+            .store(in: &cancellables)
     }
 }

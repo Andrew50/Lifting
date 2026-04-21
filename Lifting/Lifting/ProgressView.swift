@@ -105,13 +105,7 @@ struct ProgressView: View {
                             BodyWeightProgressView(bodyWeightStore: bodyWeightStore)
 
                         case .strength:
-                            VStack {
-                                Spacer()
-                                Text("Coming soon")
-                                    .foregroundStyle(AppTheme.textTertiary)
-                                Spacer()
-                            }
-                            .frame(maxWidth: .infinity)
+                            StrengthProgressView(workoutStore: workoutStore)
                         }
                     }
                     .background(AppTheme.background)

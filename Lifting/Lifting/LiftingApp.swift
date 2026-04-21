@@ -35,7 +35,12 @@ struct LiftingApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView(container: container, tabNav: container.tabNavigationCoordinator)
+            ContentView(
+                container: container,
+                authStore: container.authStore,
+                onboardingStore: container.onboardingStore,
+                tabNav: container.tabNavigationCoordinator
+            )
         }
     }
 }

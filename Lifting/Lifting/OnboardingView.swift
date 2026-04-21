@@ -7,6 +7,7 @@ import SwiftUI
 
 struct OnboardingView: View {
     @ObservedObject var store: OnboardingStore
+    /// Kept for call-site consistency / future use (e.g. personalized copy).
     @ObservedObject var authStore: AuthStore
     let onComplete: () -> Void
 
@@ -14,191 +15,115 @@ struct OnboardingView: View {
     @State private var selectedGoal: FitnessGoal? = nil
     @State private var selectedAge: TrainingAge? = nil
     @State private var selectedFrequency: WeeklyFrequency? = nil
-    @State private var signupBannerVisible = false
 
     var body: some View {
         ZStack {
             AppTheme.background.ignoresSafeArea()
 
-            if currentStep < 3 {
-                questionnaireContent
-            } else {
-                authContent
-            }
-        }
-        .onChange(of: authStore.currentUser) { _, newUser in
-            guard currentStep == 3, newUser != nil else { return }
-
-            if authStore.justSignedUp {
-                authStore.logOut()
-                authStore.justSignedUp = false
-                withAnimation(.spring(response: 0.3)) {
-                    signupBannerVisible = true
-                }
-            } else {
-                finishOnboarding()
-            }
-        }
-    }
-
-    // MARK: - Questionnaire (steps 0–2)
-
-    private var questionnaireContent: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                ForEach(0..<3) { i in
-                    Capsule()
-                        .fill(i == currentStep
-                            ? AppTheme.accent
-                            : AppTheme.fieldBorder)
-                        .frame(width: i == currentStep ? 24 : 8, height: 8)
-                        .animation(.spring(response: 0.3), value: currentStep)
-                }
-            }
-            .padding(.top, 60)
-
-            Spacer()
-
-            Group {
-                switch currentStep {
-                case 0:
-                    OnboardingStepView(
-                        title: "What's your main goal?",
-                        subtitle: "We'll tailor your workouts around this.",
-                        items: FitnessGoal.allCases.map {
-                            OnboardingItem(
-                                id: $0.rawValue,
-                                title: $0.title,
-                                subtitle: $0.subtitle,
-                                icon: $0.icon
-                            )
-                        },
-                        selectedId: selectedGoal?.rawValue,
-                        onSelect: { id in
-                            selectedGoal = FitnessGoal(rawValue: id)
-                        }
-                    )
-                case 1:
-                    OnboardingStepView(
-                        title: "How long have you been lifting?",
-                        subtitle: "This helps calibrate your recovery model.",
-                        items: TrainingAge.allCases.map {
-                            OnboardingItem(
-                                id: $0.rawValue,
-                                title: $0.title,
-                                subtitle: $0.subtitle,
-                                icon: $0.icon
-                            )
-                        },
-                        selectedId: selectedAge?.rawValue,
-                        onSelect: { id in
-                            selectedAge = TrainingAge(rawValue: id)
-                        }
-                    )
-                case 2:
-                    OnboardingStepView(
-                        title: "How often do you train?",
-                        subtitle: "We'll plan around your schedule.",
-                        items: WeeklyFrequency.allCases.map {
-                            OnboardingItem(
-                                id: $0.rawValue,
-                                title: $0.title,
-                                subtitle: $0.subtitle,
-                                icon: $0.icon
-                            )
-                        },
-                        selectedId: selectedFrequency?.rawValue,
-                        onSelect: { id in
-                            selectedFrequency = WeeklyFrequency(rawValue: id)
-                        }
-                    )
-                default:
-                    EmptyView()
-                }
-            }
-            .transition(
-                .asymmetric(
-                    insertion: .move(edge: .trailing).combined(with: .opacity),
-                    removal: .move(edge: .leading).combined(with: .opacity)
-                )
-            )
-
-            Spacer()
-
-            Button {
-                withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                    if currentStep < 2 {
-                        currentStep += 1
-                    } else {
-                        if let goal = selectedGoal,
-                           let age = selectedAge,
-                           let freq = selectedFrequency {
-                            store.saveAnswers(
-                                goal: goal,
-                                trainingAge: age,
-                                frequency: freq
-                            )
-                            currentStep = 3
-                        }
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    ForEach(0..<3) { i in
+                        Capsule()
+                            .fill(i == currentStep ? AppTheme.accent : AppTheme.fieldBorder)
+                            .frame(width: i == currentStep ? 24 : 8, height: 8)
                     }
                 }
-            } label: {
-                Text(currentStep < 2 ? "Continue" : "Get Started")
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(isCurrentStepComplete
-                        ? AppTheme.accent
-                        : AppTheme.textTertiary)
-                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            }
-            .disabled(!isCurrentStepComplete)
-            .padding(.horizontal, 24)
-            .padding(.bottom, 16)
+                .padding(.top, 24)
+                .padding(.bottom, 48)
+                .animation(.spring(response: 0.3, dampingFraction: 0.75), value: currentStep)
 
-            if currentStep > 0 {
+                Group {
+                    switch currentStep {
+                    case 0:
+                        OnboardingStepView(
+                            title: "What's your main goal?",
+                            subtitle: "We'll tailor your workouts around this.",
+                            items: FitnessGoal.allCases.map {
+                                OnboardingItem(id: $0.rawValue, title: $0.title, subtitle: $0.subtitle, icon: $0.icon)
+                            },
+                            selectedId: selectedGoal?.rawValue,
+                            onSelect: { id in selectedGoal = FitnessGoal(rawValue: id) }
+                        )
+                    case 1:
+                        OnboardingStepView(
+                            title: "How long have you been lifting?",
+                            subtitle: "This helps calibrate your recovery model.",
+                            items: TrainingAge.allCases.map {
+                                OnboardingItem(id: $0.rawValue, title: $0.title, subtitle: $0.subtitle, icon: $0.icon)
+                            },
+                            selectedId: selectedAge?.rawValue,
+                            onSelect: { id in selectedAge = TrainingAge(rawValue: id) }
+                        )
+                    case 2:
+                        OnboardingStepView(
+                            title: "How often do you train?",
+                            subtitle: "We'll plan around your schedule.",
+                            items: WeeklyFrequency.allCases.map {
+                                OnboardingItem(id: $0.rawValue, title: $0.title, subtitle: $0.subtitle, icon: $0.icon)
+                            },
+                            selectedId: selectedFrequency?.rawValue,
+                            onSelect: { id in selectedFrequency = WeeklyFrequency(rawValue: id) }
+                        )
+                    default:
+                        EmptyView()
+                    }
+                }
+                .transition(
+                    .asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    )
+                )
+
+                Spacer()
+
                 Button {
                     withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                        currentStep -= 1
+                        if currentStep < 2 {
+                            currentStep += 1
+                        } else {
+                            if let goal = selectedGoal,
+                               let age = selectedAge,
+                               let freq = selectedFrequency {
+                                store.completeOnboarding(
+                                    goal: goal,
+                                    trainingAge: age,
+                                    frequency: freq
+                                )
+                                onComplete()
+                            }
+                        }
                     }
                 } label: {
-                    Text("Back")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundStyle(AppTheme.textSecondary)
+                    Text(currentStep < 2 ? "Continue" : "Get Started")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(isCurrentStepComplete ? AppTheme.accent : AppTheme.textTertiary)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 }
-                .padding(.bottom, 32)
-            } else {
-                Spacer().frame(height: 52)
-            }
-        }
-    }
+                .disabled(!isCurrentStepComplete)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 16)
 
-    // MARK: - Auth (step 3)
-
-    private var authContent: some View {
-        NavigationStack {
-            VStack(spacing: 0) {
-                if signupBannerVisible {
-                    HStack(spacing: 8) {
-                        Image(systemName: "checkmark.circle.fill")
-                        Text("Account created! Please log in.")
+                if currentStep > 0 {
+                    Button {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                            currentStep -= 1
+                        }
+                    } label: {
+                        Text("Back")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(AppTheme.textSecondary)
                     }
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.white)
-                    .padding(.vertical, 12)
-                    .padding(.horizontal, 16)
-                    .frame(maxWidth: .infinity)
-                    .background(AppTheme.accent)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .padding(.bottom, 32)
+                } else {
+                    Spacer().frame(height: 52)
                 }
-
-                LoginView(authStore: authStore, dismissSheet: nil)
             }
         }
     }
-
-    // MARK: - Helpers
 
     private var isCurrentStepComplete: Bool {
         switch currentStep {
@@ -207,18 +132,6 @@ struct OnboardingView: View {
         case 2: return selectedFrequency != nil
         default: return false
         }
-    }
-
-    private func finishOnboarding() {
-        guard let goal = store.fitnessGoal,
-              let age = store.trainingAge,
-              let freq = store.weeklyFrequency else { return }
-        store.completeOnboarding(
-            goal: goal,
-            trainingAge: age,
-            frequency: freq
-        )
-        onComplete()
     }
 }
 

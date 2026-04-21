@@ -77,6 +77,7 @@ final class AuthStore: ObservableObject {
         }
     }
 
+    /// Prefer `currentUser != nil` in SwiftUI `body` so the view tracks `@Published currentUser`.
     var isLoggedIn: Bool { currentUser != nil }
 
     // MARK: - Sign up
@@ -123,10 +124,15 @@ final class AuthStore: ObservableObject {
     // MARK: - Log in
 
     func logIn(email: String, password: String) throws {
+        print("🔵 [AuthStore] logIn entered")
         let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !trimmedEmail.isEmpty else { throw AuthError.emailRequired }
+        guard !trimmedEmail.isEmpty else {
+            print("🔴 [AuthStore] email empty → emailRequired")
+            throw AuthError.emailRequired
+        }
 
         let passwordHash = Self.hashPassword(password)
+        print("🔵 [AuthStore] looking up user for email: \(trimmedEmail)")
 
         // --- DEV STUB START ---
         // Store raw credentials for future server integration
@@ -140,6 +146,7 @@ final class AuthStore: ObservableObject {
                 .filter(UserRecord.Columns.email == trimmedEmail)
                 .fetchOne(db)
         }
+        print("🔵 [AuthStore] existing user: \(existingUser != nil ? "yes" : "no (will auto-create)")")
 
         let user: UserRecord
         if let existing = existingUser {
@@ -173,6 +180,7 @@ final class AuthStore: ObservableObject {
         justSignedUp = false
         currentUser = user
         persistSession(userId: user.id)
+        print("🟢 [AuthStore] logIn complete, session persisted for user id: \(user.id)")
     }
 
     // MARK: - Log out

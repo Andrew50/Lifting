@@ -13,6 +13,8 @@ import SwiftUI
 
 struct ContentView: View {
     @ObservedObject var container: AppContainer
+    @ObservedObject var authStore: AuthStore
+    @ObservedObject var onboardingStore: OnboardingStore
     @ObservedObject var tabNav: TabNavigationCoordinator
 
     private let preferredWorkoutTabIconName = "figure.strengthtraining.traditional"
@@ -38,16 +40,30 @@ struct ContentView: View {
     }
 
     var body: some View {
-        Group {
-            if !container.onboardingStore.hasCompletedOnboarding {
-                OnboardingView(store: container.onboardingStore, authStore: container.authStore) {
+        let _ = print(
+            "🟣 [ContentView] body evaluating — currentUser: \(authStore.currentUser?.id ?? "nil"), onboarding done: \(onboardingStore.hasCompletedOnboarding)"
+        )
+        return Group {
+            if authStore.currentUser == nil {
+                NavigationStack {
+                    LoginView(authStore: authStore)
+                }
+                .transition(.opacity)
+            } else if !onboardingStore.hasCompletedOnboarding {
+                OnboardingView(
+                    store: onboardingStore,
+                    authStore: authStore
+                ) {
+                    // onComplete — no-op, view re-renders automatically
                 }
                 .transition(.opacity)
             } else {
                 mainTabView
+                    .transition(.opacity)
             }
         }
-        .animation(.easeInOut(duration: 0.3), value: container.onboardingStore.hasCompletedOnboarding)
+        .animation(.easeInOut(duration: 0.3), value: authStore.currentUser != nil)
+        .animation(.easeInOut(duration: 0.3), value: onboardingStore.hasCompletedOnboarding)
     }
 
     private var mainTabView: some View {
@@ -56,9 +72,9 @@ struct ContentView: View {
                 templateStore: container.templateStore,
                 workoutStore: container.workoutStore,
                 exerciseStore: container.exerciseStore,
-                authStore: container.authStore,
+                authStore: authStore,
                 bodyWeightStore: container.bodyWeightStore,
-                onboardingStore: container.onboardingStore,
+                onboardingStore: onboardingStore,
                 tabNav: tabNav
             )
             .tabItem {
@@ -89,7 +105,7 @@ struct ContentView: View {
             .tag(AppTab.exercises)
 
             NavigationStack {
-                ProfileView(container: container, authStore: container.authStore, onboardingStore: container.onboardingStore)
+                ProfileView(container: container, authStore: authStore, onboardingStore: onboardingStore)
             }
             .tabItem {
                 Label("Profile", systemImage: resolvedIconName(preferred: preferredProfileTabIconName, fallback: fallbackProfileTabIconName))
@@ -110,6 +126,11 @@ struct ContentView: View {
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         let container = AppContainer()
-        return ContentView(container: container, tabNav: container.tabNavigationCoordinator)
+        return ContentView(
+            container: container,
+            authStore: container.authStore,
+            onboardingStore: container.onboardingStore,
+            tabNav: container.tabNavigationCoordinator
+        )
     }
 }

@@ -1253,4 +1253,123 @@ extension WorkoutStore {
             )
         } ?? "Unknown"
     }
+
+    func fetchKeyLiftsData() throws -> [KeyLiftCardData] {
+        try dbQueue.read { db in
+            var results: [KeyLiftCardData] = []
+            let candidates = KeyLifts.primary + KeyLifts.secondary
+
+            for lift in candidates {
+                guard
+                    let exerciseRow = try Row.fetchOne(
+                        db,
+                        sql: "SELECT id, name FROM exercises WHERE name = ? LIMIT 1",
+                        arguments: [lift.id]
+                    )
+                else {
+                    if lift.isPrimary {
+                        results.append(
+                            KeyLiftCardData(
+                                id: lift.id,
+                                displayName: lift.displayName,
+                                exerciseName: lift.id,
+                                currentOneRM: nil,
+                                previousOneRM: nil,
+                                lastTrainedAt: nil
+                            ))
+                    }
+                    continue
+                }
+
+                let exerciseId: String = exerciseRow["id"]
+                let exerciseName: String = exerciseRow["name"]
+
+                let snapshots = try Row.fetchAll(
+                    db,
+                    sql: """
+                        SELECT estimated_1rm, recorded_at
+                        FROM strength_snapshots
+                        WHERE exercise_id = ?
+                        ORDER BY recorded_at DESC
+                        LIMIT 10
+                        """,
+                    arguments: [exerciseId]
+                )
+
+                if snapshots.isEmpty {
+                    if lift.isPrimary {
+                        results.append(
+                            KeyLiftCardData(
+                                id: exerciseId,
+                                displayName: lift.displayName,
+                                exerciseName: exerciseName,
+                                currentOneRM: nil,
+                                previousOneRM: nil,
+                                lastTrainedAt: nil
+                            ))
+                    }
+                    continue
+                }
+
+                let currentOneRM: Double = snapshots[0]["estimated_1rm"]
+                let lastTrainedAt: Double = snapshots[0]["recorded_at"]
+                let previousOneRM: Double? =
+                    snapshots.count > 1 ? snapshots[1]["estimated_1rm"] : nil
+
+                results.append(
+                    KeyLiftCardData(
+                        id: exerciseId,
+                        displayName: lift.displayName,
+                        exerciseName: exerciseName,
+                        currentOneRM: currentOneRM,
+                        previousOneRM: previousOneRM,
+                        lastTrainedAt: lastTrainedAt
+                    ))
+            }
+
+            return results
+        }
+    }
+
+    func fetchRecentPRs(limit: Int = 20) throws -> [PRFeedItem] {
+        try dbQueue.read { db in
+            let rows = try Row.fetchAll(
+                db,
+                sql: """
+                    SELECT pr.id, pr.exercise_id, pr.weight, pr.reps, pr.estimated_1rm, pr.achieved_at, e.name AS exercise_name
+                    FROM personal_records pr
+                    JOIN exercises e ON e.id = pr.exercise_id
+                    ORDER BY pr.achieved_at DESC
+                    LIMIT 200
+                    """
+            )
+
+            var seenKeys = Set<String>()
+            var items: [PRFeedItem] = []
+            items.reserveCapacity(limit)
+
+            for row in rows {
+                let exerciseId: String = row["exercise_id"]
+                let weight: Double = row["weight"]
+                let reps: Int = row["reps"]
+                let key = "\(exerciseId)|\(weight)|\(reps)"
+                if seenKeys.contains(key) { continue }
+                seenKeys.insert(key)
+
+                items.append(
+                    PRFeedItem(
+                        id: row["id"],
+                        exerciseName: row["exercise_name"],
+                        weight: weight,
+                        reps: reps,
+                        estimatedOneRM: row["estimated_1rm"],
+                        achievedAt: row["achieved_at"]
+                    ))
+
+                if items.count >= limit { break }
+            }
+
+            return items
+        }
+    }
 }
